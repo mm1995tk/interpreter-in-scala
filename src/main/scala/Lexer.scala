@@ -1,10 +1,7 @@
 case class Lexer(input: String, cursor: Int = 0):
   def next(i: Int = 0) = advanceCursorRecursive(i, this.advanceCursor)
 
-  def getNextToken = for {
-    skipped <- this.skipWhitespace
-    ch <- skipped.getChar
-  } yield ch match {
+  def getNextToken = this.getChar map {
     case '=' => Token.ASSIGN
     case '+' => Token.PLUS
     case '(' => Token.LPAREN
