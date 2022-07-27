@@ -1,10 +1,23 @@
-// For more information on writing tests, see
-// https://scalameta.org/munit/docs/getting-started.html
 class LexerTest extends munit.FunSuite {
-  test("test of lexer") {
-    val obtained = 42
-    val expected = 42
-    assertEquals(obtained, expected)
-  }
+  test("next token") {
+    val input = " = +(  ){ },;p"
+    val lexer = Lexer.from(input)
 
+    for (
+      (token, index) <- Seq(
+        Token.ASSIGN,
+        Token.PLUS,
+        Token.LPAREN,
+        Token.RPAREN,
+        Token.LBRACE,
+        Token.RBRACE,
+        Token.COMMA,
+        Token.SEMICOLON,
+        Token.ILLEGAL
+      ).zipWithIndex
+    ) {
+
+      assertEquals(lexer.next(index).get.getNextToken.get, token)
+    }
+  }
 }
