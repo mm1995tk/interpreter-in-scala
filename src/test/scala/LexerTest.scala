@@ -1,8 +1,7 @@
 class LexerTest extends munit.FunSuite {
   test("ソースコード") {
     import Token.*
-    val input = scala.io.Source.fromResource("sample.monkey").getLines.mkString
-    var lexer = Lexer.from(input)
+    var lexer = Lexer.from(scala.io.Source.fromResource("sample.monkey").getLines.mkString)
 
     for (
       (token, index) <- Seq(
@@ -82,14 +81,10 @@ class LexerTest extends munit.FunSuite {
       ).zipWithIndex
     ) {
       val (nextLexer, curToken) = lexer.getToken
-
       assertEquals(curToken, token)
       lexer = nextLexer
     }
     val (nextLexer, curToken) = lexer.getToken
-
     assertEquals(curToken, Token.EOF)
-    lexer = nextLexer
-
   }
 }
