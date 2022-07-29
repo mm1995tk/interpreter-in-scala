@@ -1,4 +1,29 @@
-@main def repl: Unit =
-  val lexer = Lexer.from("app")
-  // println(lexer.get_cur_ch)
-  // println(lexer.read_char.read_char.get_cur_ch)
+import scala.sys.process.processInternal
+@main def main: Unit =
+  println("\nWelcome to Monkey Language!");
+  println("");
+  repl
+
+def repl: Unit =
+  print(">> ")
+  val input = scala.io.StdIn.readLine()
+  if (input == "exit;") {
+    println("");
+    println("thanks for using!");
+    println("");
+
+    System.exit(0);
+  }
+  println("");
+
+  loop(Lexer.from(input))
+  repl
+
+def loop(lexer: Lexer): Unit =
+  val (next, token) = lexer.getToken
+  if (token == Token.EOF) {
+    println("");
+    return
+  }
+  println(token)
+  loop(next)
