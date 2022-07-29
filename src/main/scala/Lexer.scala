@@ -31,7 +31,7 @@ case class Lexer(input: String, cursor: Int = 0):
         case "true"   => Token.TRUE
         case "false"  => Token.FALSE
         case "fn"     => Token.FUNCTION
-        case ch       => Token.IDENT(ch)
+        case _        => Token.IDENT(ident)
     }
 
   private def next = this.advanceCursor.skipWhitespace
