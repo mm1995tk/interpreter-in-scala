@@ -3,11 +3,11 @@ case class Lexer(input: String, cursor: Int = 0):
     val next = this.next
     this.getChar match
       case '=' =>
-        if next.getChar == '=' then (next.next, Token.EQ)
+        if next.getChar == '=' then next.next -> Token.EQ
         else next -> Token.ASSIGN
 
       case '!' =>
-        if next.getChar == '=' then (next.next, Token.NotEQ)
+        if next.getChar == '=' then next.next -> Token.NotEQ
         else next -> Token.BANG
 
       case ch: CodeLiteral => next -> ch.convertCharOfCodeToToken
