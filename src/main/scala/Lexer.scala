@@ -1,4 +1,4 @@
-case class Lexer(input: String, cursor: Int = 0):
+class Lexer private (input: String, cursor: Int = 0):
   def getToken: (Lexer, Token) =
     val next = this.next
     this.getChar match
