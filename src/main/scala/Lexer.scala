@@ -1,3 +1,7 @@
+package lexer
+
+import token.Token
+
 class Lexer private (input: String, cursor: Int = 0):
   def getToken: (Lexer, Token) =
     val next = this.next

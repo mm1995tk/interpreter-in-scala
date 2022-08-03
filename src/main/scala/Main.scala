@@ -1,4 +1,7 @@
 import scala.sys.process.processInternal
+import lexer.Lexer
+import token.Token
+
 @main def main: Unit =
   println("\nWelcome to Monkey Language!");
   println("");

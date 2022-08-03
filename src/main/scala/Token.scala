@@ -1,3 +1,5 @@
+package token
+
 enum Token:
   case ILLEGAL,
     EOF,
