@@ -2,7 +2,7 @@ import token.Token.*
 import lexer.Lexer
 class LexerTest extends munit.FunSuite {
   test("ソースコード") {
-    var lexer = Lexer.from(scala.io.Source.fromResource("sample.monkey").getLines.mkString)
+    var lexer = Lexer(scala.io.Source.fromResource("sample.monkey").getLines.mkString)
 
     for (
       (token, index) <- Seq(

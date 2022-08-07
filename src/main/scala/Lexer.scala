@@ -2,7 +2,7 @@ package lexer
 
 import token.Token
 
-class Lexer private (input: String, cursor: Int = 0):
+class Lexer private (input: String, cursor: Int):
   def getToken: (Lexer, Token) =
     val next = this.next
     this.getChar match
@@ -48,7 +48,7 @@ class Lexer private (input: String, cursor: Int = 0):
     if this.cursor > this.input.length - 1 then 0.toChar
     else this.input.charAt(this.cursor)
 
-  private def advanceCursor = Lexer(this.input, this.cursor + 1)
+  private def advanceCursor = new Lexer(this.input, this.cursor + 1)
 
   private def readIdentifier(relativePos: Int = 0, next: Lexer = this.next): (Lexer, String) =
     if !next.getChar.isLetter then
@@ -61,7 +61,7 @@ class Lexer private (input: String, cursor: Int = 0):
     else this.readNumber(relativePos + 1, next.advanceCursor)
 
 object Lexer:
-  def from(input: String): Lexer = Lexer(input).skipWhitespace
+  def apply(input: String): Lexer = new Lexer(input, 0).skipWhitespace
 
 extension (item: Char)
   private def isAsciiWhitespace: Boolean = item match

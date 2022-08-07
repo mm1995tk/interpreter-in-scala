@@ -19,7 +19,7 @@ def repl: Unit =
   }
   println("");
 
-  loop(Lexer.from(input))
+  loop(Lexer(input))
   repl
 
 def loop(lexer: Lexer): Unit =
