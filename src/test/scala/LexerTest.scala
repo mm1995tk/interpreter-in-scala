@@ -5,7 +5,7 @@ class LexerTest extends munit.FunSuite {
     var lexer = Lexer(scala.io.Source.fromResource("sample.monkey").getLines.mkString)
 
     for (
-      (token, index) <- Seq(
+      token <- Seq(
         LET,
         IDENT("five"),
         ASSIGN,
@@ -79,7 +79,7 @@ class LexerTest extends munit.FunSuite {
         NotEQ,
         INT(9),
         SEMICOLON
-      ).zipWithIndex
+      )
     ) {
       val (nextLexer, curToken) = lexer.getToken
       assertEquals(curToken, token)
@@ -88,4 +88,5 @@ class LexerTest extends munit.FunSuite {
     val (nextLexer, curToken) = lexer.getToken
     assertEquals(curToken, EOF)
   }
+
 }
