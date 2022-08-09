@@ -16,27 +16,11 @@ class Lexer private (input: String, cursor: Int):
 
       case ch: CodeLiteral => next -> ch.convertCharOfCodeToToken
 
-      case ch if ch.isDigit =>
-        val (lexer, token) = this.readNumber()
-        lexer.skipWhitespace -> token
+      case ch if ch.isDigit => this.readNumber(next)
 
-      case ch if ch.isLetter => this.getKeyWordToken
+      case ch if ch.isLetter => this.readIdentifier(next)
       case 0                 => next -> Token.EOF
       case _                 => next -> Token.ILLEGAL
-
-  private def getKeyWordToken =
-    val (lexer, ident) = this.readIdentifier()
-    lexer.skipWhitespace -> {
-      ident match
-        case "let"    => Token.LET
-        case "return" => Token.RETURN
-        case "if"     => Token.IF
-        case "else"   => Token.ELSE
-        case "true"   => Token.TRUE
-        case "false"  => Token.FALSE
-        case "fn"     => Token.FUNCTION
-        case _        => Token.IDENT(ident)
-    }
 
   private def next = this.advanceCursor.skipWhitespace
 
@@ -50,15 +34,26 @@ class Lexer private (input: String, cursor: Int):
 
   private def advanceCursor = new Lexer(this.input, this.cursor + 1)
 
-  private def readIdentifier(relativePos: Int = 0, next: Lexer = this.next): (Lexer, String) =
+  private def readIdentifier(next: Lexer, relativePos: Int = 0): (Lexer, Token) =
     if !next.getChar.isLetter then
-      next -> input.substring(this.cursor, this.cursor + relativePos + 1)
-    else this.readIdentifier(relativePos + 1, next.advanceCursor)
+      next.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
+        case "let"    => Token.LET
+        case "return" => Token.RETURN
+        case "if"     => Token.IF
+        case "else"   => Token.ELSE
+        case "true"   => Token.TRUE
+        case "false"  => Token.FALSE
+        case "fn"     => Token.FUNCTION
+        case others   => Token.IDENT(others)
+      )
+    else this.readIdentifier(next.advanceCursor, relativePos + 1)
 
-  private def readNumber(relativePos: Int = 0, next: Lexer = this.next): (Lexer, Token.INT) =
+  private def readNumber(next: Lexer, relativePos: Int = 0): (Lexer, Token.INT) =
     if !next.getChar.isDigit then
-      next -> Token.INT { input.substring(this.cursor, this.cursor + relativePos + 1).toInt }
-    else this.readNumber(relativePos + 1, next.advanceCursor)
+      next.skipWhitespace -> Token.INT {
+        input.substring(this.cursor, this.cursor + 1 + relativePos).toInt
+      }
+    else this.readNumber(next.advanceCursor, relativePos + 1)
 
 object Lexer:
   def apply(input: String): Lexer = new Lexer(input, 0).skipWhitespace
