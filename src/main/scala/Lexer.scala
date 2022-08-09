@@ -1,6 +1,7 @@
 package lexer
 
 import token.Token
+import scala.annotation.tailrec
 
 class Lexer private (input: String, cursor: Int):
   def getToken: (Lexer, Token) =
@@ -24,6 +25,7 @@ class Lexer private (input: String, cursor: Int):
 
   private def next = this.advanceCursor.skipWhitespace
 
+  @tailrec
   private def skipWhitespace: Lexer =
     if this.getChar.isAsciiWhitespace then this.advanceCursor.skipWhitespace
     else this
@@ -34,6 +36,7 @@ class Lexer private (input: String, cursor: Int):
 
   private def advanceCursor = new Lexer(this.input, this.cursor + 1)
 
+  @tailrec
   private def readIdentifier(next: Lexer, relativePos: Int = 0): (Lexer, Token) =
     if !next.getChar.isLetter then
       next.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
@@ -48,6 +51,7 @@ class Lexer private (input: String, cursor: Int):
       )
     else this.readIdentifier(next.advanceCursor, relativePos + 1)
 
+  @tailrec
   private def readNumber(next: Lexer, relativePos: Int = 0): (Lexer, Token.INT) =
     if !next.getChar.isDigit then
       next.skipWhitespace -> Token.INT {
