@@ -1,6 +1,6 @@
 package ast
 
-opaque type Program = Seq[Statement]
+type Program = Seq[Statement]
 
 enum Statement:
   case LET(ident: Ident, expr: Expr)
@@ -10,3 +10,5 @@ enum Expr:
   case IDENT(ident: Ident)
 
 opaque type Ident = String
+object Ident:
+  def apply(str: String): Ident = str
