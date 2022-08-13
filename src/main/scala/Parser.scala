@@ -15,23 +15,24 @@ sealed case class Parser private (
 
   def parseProgram = Parser.parseProgram(this)
 
-  private def parseStatement: (Parser, Option[Statement]) =
+  private def parseStatement: (Parser, Either[ParserError, Statement]) =
     this.curToken match
       case Token.LET => this.parseLetStatement
       case Token.RETURN =>
         val (p, stmt) = this.parseReturnStatement
-        p -> Some(stmt)
-      case _ => this -> None
+        p -> Right(stmt)
+      case _ => this -> Left(ParserError.NotImplemented)
 
-  private def parseLetStatement: (Parser, Option[Statement]) =
+  private def parseLetStatement: (Parser, Either[ParserError, Statement]) =
     this.peekToken match
       case Token.IDENT(str) =>
         val nextParser = this.next
-        if nextParser.peekToken != Token.ASSIGN then nextParser -> None
+        if nextParser.peekToken != Token.ASSIGN then
+          nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.ASSIGN))
         else
           val ident: Ident = Ident(str)
-          nextParser.skipToSemicolon -> Some(Statement.LET(ident, Expr.IDENT(ident)))
-      case _ => this -> None
+          nextParser.skipToSemicolon -> Right(Statement.LET(ident, Expr.IDENT(ident)))
+      case token => this -> Left(ParserError.UnexpectedToken(token, Token.IDENT("variable names")))
 
   private def parseReturnStatement: (Parser, Statement) =
     this.skipToSemicolon -> Statement.RETURN { Expr.IDENT(Ident("dummy")) }
@@ -51,13 +52,27 @@ object Parser:
     new Parser(thirdLexer, curToken, peekToken)
 
   @tailrec
-  private def parseProgram(parser: Parser, result: Program = Seq()): Program =
-    if parser.curToken == Token.EOF then result
+  private def parseProgram(
+      parser: Parser,
+      result: Either[ParserErrors, Program] = Right(Seq())
+  ): Either[ParserErrors, Program] =
+    if parser.curToken.equals(Token.EOF) then result
     else
       val parsed = parser.parseStatement
       parsed._2 match
-        case Some(stmt) => parseProgram(parsed._1.next, result :+ stmt)
-        case _          => result
+        case Right(stmt) => parseProgram(parsed._1.next, result.map(_ :+ stmt))
+        case Left(err) =>
+          parseProgram(
+            parsed._1.next,
+            Left {
+              result match
+                case Left(seq) => seq :+ err
+                case _         => Seq(err)
+            }
+          )
 
 enum ParserError:
-  case UnexpextedToken(obtained: Token, expexted: Token)
+  case NotImplemented
+  case UnexpectedToken(obtained: Token, expexted: Token)
+
+type ParserErrors = Seq[ParserError]
