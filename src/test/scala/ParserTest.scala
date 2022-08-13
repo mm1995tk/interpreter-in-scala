@@ -3,6 +3,7 @@ import parser.Parser
 import ast.Statement
 import token.Token
 import parser.ParserError
+import ast.Expr
 
 class ParserTest extends munit.FunSuite {
 
@@ -69,6 +70,22 @@ class ParserTest extends munit.FunSuite {
 
   }
 
+  test("識別子のテスト") {
+    val input = "foobar;"
+    val parser = Parser(Lexer(input))
+    val stmts = parser.parseProgram.getOrElse(Seq())
+
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    val stmt = stmts.head
+    assert(stmt match
+      case Statement.EXPR(Expr.IDENT(Token.IDENT(value))) => value == "foobar"
+      case _                                              => false
+    )
+
+  }
 }
 
 enum LetTestErr:
@@ -76,7 +93,7 @@ enum LetTestErr:
 
 def contentOfTestLetStatements(statement: Statement, name: String): Option[LetTestErr] =
   statement match
-    case Statement.LET(ident, _) => {
-      if ident.toString == name then None else Some(LetTestErr.NotMatchName)
+    case Statement.LET(Token.IDENT(value), _) => {
+      if value == name then None else Some(LetTestErr.NotMatchName)
     }
     case _ => Some(LetTestErr.NotLetStatement)

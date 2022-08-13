@@ -1,14 +1,15 @@
 package ast
 
+import token.Token
+
 type Program = Seq[Statement]
 
 enum Statement:
   case LET(ident: Ident, expr: Expr)
   case RETURN(expr: Expr)
+  case EXPR(expr: Expr)
 
 enum Expr:
   case IDENT(ident: Ident)
 
-opaque type Ident = String
-object Ident:
-  def apply(str: String): Ident = str
+private type Ident = Token.IDENT

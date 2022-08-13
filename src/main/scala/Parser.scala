@@ -21,21 +21,32 @@ sealed case class Parser private (
       case Token.RETURN =>
         val (p, stmt) = this.parseReturnStatement
         p -> Right(stmt)
-      case _ => this -> Left(ParserError.NotImplemented)
+      case _ => this.parseExprStatement
 
   private def parseLetStatement: (Parser, Either[ParserError, Statement]) =
     this.peekToken match
-      case Token.IDENT(str) =>
+      case ident @ Token.IDENT(str) =>
         val nextParser = this.next
         if nextParser.peekToken != Token.ASSIGN then
           nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.ASSIGN))
-        else
-          val ident: Ident = Ident(str)
-          nextParser.skipToSemicolon -> Right(Statement.LET(ident, Expr.IDENT(ident)))
+        else nextParser.skipToSemicolon -> Right(Statement.LET(ident, Expr.IDENT(ident)))
       case token => this -> Left(ParserError.UnexpectedToken(token, Token.IDENT("variable names")))
 
   private def parseReturnStatement: (Parser, Statement) =
-    this.skipToSemicolon -> Statement.RETURN { Expr.IDENT(Ident("dummy")) }
+    this.skipToSemicolon -> Statement.RETURN { Expr.IDENT(Token.IDENT("dummy")) }
+
+  private def parseExprStatement: (Parser, Either[ParserError, Statement]) =
+    (if this.peekToken.equals(Token.SEMICOLON) then this.next else this) -> this
+      .parseExpr(Precedence.LOWEST)
+      .map(Statement.EXPR(_))
+
+  private def parseExpr(precedence: Precedence): Either[ParserError, Expr] = this.curToken match
+    case Token.IDENT(_) => this.parseIdentifier
+    case _ => Left(ParserError.NotImplemented)
+
+  private def parseIdentifier: Either[ParserError, Expr] = this.curToken match
+    case ident @ Token.IDENT(_) => Right(Expr.IDENT(ident))
+    case other                  => Left(ParserError.UnexpectedToken(other, Token.IDENT("any identity")))
 
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken
@@ -76,3 +87,8 @@ enum ParserError:
   case UnexpectedToken(obtained: Token, expexted: Token)
 
 type ParserErrors = Seq[ParserError]
+
+private enum Precedence:
+  def <(target: Precedence) = this.ordinal < target.ordinal
+  def >(target: Precedence) = this.ordinal > target.ordinal
+  case LOWEST, EQUALS, LESSGREATER, SUM, PRODUCT, PREFIX, CALL
