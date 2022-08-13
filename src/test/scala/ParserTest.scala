@@ -10,12 +10,11 @@ class ParserTest extends munit.FunSuite {
     val parser = Parser(Lexer(input))
     val stmts = parser.parseProgram
 
-    if stmts.length != 3 then {
+    if stmts.length != 3 then
       println(s"statementsの要素が3でない: ${stmts.length}")
       assert(false)
-    }
 
-    for ((stmt, ident) <- stmts.zip(Seq("x", "y", "foobar"))) {
+    for ((stmt, ident) <- stmts.zip(Seq("x", "y", "foobar")))
       assert {
         contentOfTestLetStatements(stmt, ident) match
           case None => true
@@ -23,7 +22,6 @@ class ParserTest extends munit.FunSuite {
             println(err)
             false
       }
-    }
 
   }
 
@@ -32,20 +30,16 @@ class ParserTest extends munit.FunSuite {
     val parser = Parser(Lexer(input))
     val stmts = parser.parseProgram
 
-    if stmts.length != 3 then {
+    if stmts.length != 3 then
       println(s"statementsの要素が3でない: ${stmts.length}")
       assert(false)
-    }
 
-    for (stmt <- stmts) {
-
+    for (stmt <- stmts)
       assert {
         stmt match
           case Statement.RETURN(_) => true
           case _                   => false
       }
-
-    }
 
   }
 
