@@ -11,5 +11,6 @@ enum Statement:
 
 enum Expr:
   case IDENT(ident: Ident)
+  case INT(ident: Token.INT)
 
 private type Ident = Token.IDENT

@@ -42,11 +42,16 @@ sealed case class Parser private (
 
   private def parseExpr(precedence: Precedence): Either[ParserError, Expr] = this.curToken match
     case Token.IDENT(_) => this.parseIdentifier
-    case _ => Left(ParserError.NotImplemented)
+    case Token.INT(_)   => this.parseIntLiteral
+    case _              => Left(ParserError.NotImplemented)
 
   private def parseIdentifier: Either[ParserError, Expr] = this.curToken match
     case ident @ Token.IDENT(_) => Right(Expr.IDENT(ident))
     case other                  => Left(ParserError.UnexpectedToken(other, Token.IDENT("any identity")))
+
+  private def parseIntLiteral: Either[ParserError, Expr] = this.curToken match
+    case ident @ Token.INT(_) => Right(Expr.INT(ident))
+    case other                => Left(ParserError.UnexpectedToken(other, Token.IDENT("any integer")))
 
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken

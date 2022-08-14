@@ -86,6 +86,23 @@ class ParserTest extends munit.FunSuite {
     )
 
   }
+
+  test("整数リテラルのテスト") {
+    val input = "5;"
+    val parser = Parser(Lexer(input))
+    val stmts = parser.parseProgram.getOrElse(Seq())
+
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    val stmt = stmts.head
+    assert(stmt match
+      case Statement.EXPR(Expr.INT(Token.INT(value))) => value == 5
+      case _                                          => false
+    )
+
+  }
 }
 
 enum LetTestErr:
