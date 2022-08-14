@@ -1,8 +1,8 @@
+package parser
+
 import lexer.Lexer
-import parser.Parser
 import ast.Statement
 import token.Token
-import parser.ParserError
 import ast.Expr
 
 class ParserTest extends munit.FunSuite {

@@ -13,17 +13,15 @@ sealed case class Parser private (
     private val peekToken: Token
 ):
 
-  def parseProgram = Parser.parseProgram(this)
+  def parseProgram: Either[ParserErrors, Program] = Parser.parseProgram(this)
 
-  private def parseStatement: (Parser, Either[ParserError, Statement]) =
+  private def parseStatement: ParserState[Statement] =
     this.curToken match
-      case Token.LET => this.parseLetStatement
-      case Token.RETURN =>
-        val (p, stmt) = this.parseReturnStatement
-        p -> Right(stmt)
-      case _ => this.parseExprStatement
+      case Token.LET    => this.parseLetStatement
+      case Token.RETURN => this.parseReturnStatement
+      case _            => this.parseExprStatement
 
-  private def parseLetStatement: (Parser, Either[ParserError, Statement]) =
+  private def parseLetStatement: ParserState[Statement] =
     this.peekToken match
       case ident @ Token.IDENT(str) =>
         val nextParser = this.next
@@ -32,29 +30,34 @@ sealed case class Parser private (
         else nextParser.skipToSemicolon -> Right(Statement.LET(ident, Expr.IDENT(ident)))
       case token => this -> Left(ParserError.UnexpectedToken(token, Token.IDENT("variable names")))
 
-  private def parseReturnStatement: (Parser, Statement) =
-    this.skipToSemicolon -> Statement.RETURN { Expr.IDENT(Token.IDENT("dummy")) }
+  private def parseReturnStatement: ParserState[Statement] =
+    this.skipToSemicolon -> Right(Statement.RETURN { Expr.IDENT(Token.IDENT("dummy")) })
 
-  private def parseExprStatement: (Parser, Either[ParserError, Statement]) =
+  private def parseExprStatement: ParserState[Statement] =
     val (parser, result) = this.parseExpr(Precedence.LOWEST)
     val nextParser = if parser.peekToken.equals(Token.SEMICOLON) then parser.next else parser
     nextParser -> result.map(Statement.EXPR(_))
 
-  private def parseExpr(precedence: Precedence): (Parser, Either[ParserError, Expr]) = this.curToken match
-    case Token.IDENT(_)           => this -> this.parseIdentifier
-    case Token.INT(_)             => this -> this.parseIntLiteral
-    case Token.MINUS | Token.BANG => this.parsePrefixExpr
-    case _                        => this -> Left(ParserError.NotImplemented)
+  private def parseExpr(precedence: Precedence): ParserState[Expr] =
+    this.curToken match
+      case Token.IDENT(_)           => this.parseIdentifier
+      case Token.INT(_)             => this.parseIntLiteral
+      case Token.MINUS | Token.BANG => this.parsePrefixExpr
+      case _                        => this -> Left(ParserError.NotImplemented)
 
-  private def parseIdentifier: Either[ParserError, Expr] = this.curToken match
-    case ident @ Token.IDENT(_) => Right(Expr.IDENT(ident))
-    case other                  => Left(ParserError.UnexpectedToken(other, Token.IDENT("any identity")))
+  private def parseIdentifier: ParserState[Expr] = this -> {
+    this.curToken match
+      case ident @ Token.IDENT(_) => Right(Expr.IDENT(ident))
+      case other                  => Left(ParserError.UnexpectedToken(other, Token.IDENT("any identity")))
+  }
 
-  private def parseIntLiteral: Either[ParserError, Expr] = this.curToken match
-    case ident @ Token.INT(_) => Right(Expr.INT(ident))
-    case other                => Left(ParserError.UnexpectedToken(other, Token.IDENT("any integer")))
+  private def parseIntLiteral: ParserState[Expr] = this -> {
+    this.curToken match
+      case ident @ Token.INT(_) => Right(Expr.INT(ident))
+      case other                => Left(ParserError.UnexpectedToken(other, Token.IDENT("any integer")))
+  }
 
-  private def parsePrefixExpr: (Parser, Either[ParserError, Expr]) = this.curToken match
+  private def parsePrefixExpr: ParserState[Expr] = this.curToken match
     case ident @ (Token.MINUS | Token.BANG) =>
       val (latestParser, expr) = this.next.parseExpr(Precedence.PREFIX)
       latestParser -> expr.map(Expr.PREFIX(ident, _))
@@ -94,11 +97,13 @@ object Parser:
             }
           )
 
-enum ParserError:
+private type ParserState[T] = (Parser, Either[ParserError, T])
+
+private enum ParserError:
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
 
-type ParserErrors = Seq[ParserError]
+private type ParserErrors = Seq[ParserError]
 
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
