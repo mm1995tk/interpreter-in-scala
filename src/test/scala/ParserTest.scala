@@ -103,6 +103,28 @@ class ParserTest extends munit.FunSuite {
     )
 
   }
+
+  test("前置演算子のテスト") {
+    val input = "-15;!5;"
+    val parser = Parser(Lexer(input))
+    val stmts = parser.parseProgram.getOrElse(Seq())
+
+    if stmts.length != 2 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    val expecteds = Seq((Token.MINUS, 15), (Token.BANG, 5))
+
+    stmts.zip(expecteds).foreach { (stmt, expected) =>
+      assertEquals(
+        stmt,
+        Statement.EXPR {
+          Expr.PREFIX(expected._1, Expr.INT(Token.INT(expected._2)))
+        }
+      )
+    }
+
+  }
 }
 
 enum LetTestErr:

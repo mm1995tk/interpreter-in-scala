@@ -36,14 +36,15 @@ sealed case class Parser private (
     this.skipToSemicolon -> Statement.RETURN { Expr.IDENT(Token.IDENT("dummy")) }
 
   private def parseExprStatement: (Parser, Either[ParserError, Statement]) =
-    (if this.peekToken.equals(Token.SEMICOLON) then this.next else this) -> this
-      .parseExpr(Precedence.LOWEST)
-      .map(Statement.EXPR(_))
+    val (parser, result) = this.parseExpr(Precedence.LOWEST)
+    val nextParser = if parser.peekToken.equals(Token.SEMICOLON) then parser.next else parser
+    nextParser -> result.map(Statement.EXPR(_))
 
-  private def parseExpr(precedence: Precedence): Either[ParserError, Expr] = this.curToken match
-    case Token.IDENT(_) => this.parseIdentifier
-    case Token.INT(_)   => this.parseIntLiteral
-    case _              => Left(ParserError.NotImplemented)
+  private def parseExpr(precedence: Precedence): (Parser, Either[ParserError, Expr]) = this.curToken match
+    case Token.IDENT(_)           => this -> this.parseIdentifier
+    case Token.INT(_)             => this -> this.parseIntLiteral
+    case Token.MINUS | Token.BANG => this.parsePrefixExpr
+    case _                        => this -> Left(ParserError.NotImplemented)
 
   private def parseIdentifier: Either[ParserError, Expr] = this.curToken match
     case ident @ Token.IDENT(_) => Right(Expr.IDENT(ident))
@@ -52,6 +53,12 @@ sealed case class Parser private (
   private def parseIntLiteral: Either[ParserError, Expr] = this.curToken match
     case ident @ Token.INT(_) => Right(Expr.INT(ident))
     case other                => Left(ParserError.UnexpectedToken(other, Token.IDENT("any integer")))
+
+  private def parsePrefixExpr: (Parser, Either[ParserError, Expr]) = this.curToken match
+    case ident @ (Token.MINUS | Token.BANG) =>
+      val (latestParser, expr) = this.next.parseExpr(Precedence.PREFIX)
+      latestParser -> expr.map(Expr.PREFIX(ident, _))
+    case other => this -> Left(ParserError.UnexpectedToken(other, Token.IDENT("minus or bang")))
 
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken
