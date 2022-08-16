@@ -46,7 +46,7 @@ class ParserTest extends munit.FunSuite {
   }
 
   test("return文のテスト") {
-    val input = "return  5;\nreturn 10;\nreturn 838383;"
+    val input = "return  5;\nreturn 15+5-10;\nreturn 838383;"
     val parser = Parser(Lexer(input))
     val stmts = parser.parseProgram.getOrElse(Seq())
 
@@ -54,12 +54,8 @@ class ParserTest extends munit.FunSuite {
       println(s"statementsの要素が3でない: ${stmts.length}")
       assert(false)
 
-    for (stmt <- stmts)
-      assert {
-        stmt match
-          case Statement.RETURN(_) => true
-          case _                   => false
-      }
+    for ((stmt, expected) <- stmts.zip(Seq("return 5;", "return ((15 + 5) - 10);", "return 838383;")))
+      assertEquals(stmt.toStr, expected)
 
   }
 

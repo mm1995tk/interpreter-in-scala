@@ -33,7 +33,8 @@ sealed case class Parser private (
       case token => this -> Left(ParserError.UnexpectedToken(token, Token.IDENT("variable names")))
 
   private def parseReturnStatement: ParserState[Statement] =
-    this.skipToSemicolon -> Right(Statement.RETURN { Expr.IDENT(Token.IDENT("dummy")) })
+    val (latestParser, eitherExpr) = this.next.parseExpr(Precedence.LOWEST)
+    latestParser.next -> eitherExpr.map(Statement.RETURN(_))
 
   private def parseExprStatement: ParserState[Statement] =
     val (parser, result) = this.parseExpr(Precedence.LOWEST)
