@@ -27,7 +27,9 @@ sealed case class Parser private (
         val nextParser = this.next
         if nextParser.peekToken != Token.ASSIGN then
           nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.ASSIGN))
-        else nextParser.skipToSemicolon -> Right(Statement.LET(ident, Expr.IDENT(ident)))
+        else
+          val (latestParser, eitherExpr) = nextParser.next.next.parseExpr(Precedence.LOWEST)
+          latestParser.next -> eitherExpr.map(Statement.LET(ident, _))
       case token => this -> Left(ParserError.UnexpectedToken(token, Token.IDENT("variable names")))
 
   private def parseReturnStatement: ParserState[Statement] =
@@ -55,7 +57,7 @@ sealed case class Parser private (
               go(parser.next.parseInfixExpr(expr))
             case _ => item
     end go
-    
+
     go(leftExp)
   end parseExpr
 

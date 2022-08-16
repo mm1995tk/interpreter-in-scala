@@ -7,7 +7,7 @@ import token.*
 class ParserTest extends munit.FunSuite {
 
   test("let文のテスト") {
-    val input = "let x = 5;\nlet y = 10;\nlet foobar = 838383;"
+    val input = "let x = 5;\nlet y = 10;\nlet foobar = 838382+1;"
     val parser = Parser(Lexer(input))
     val stmts = parser.parseProgram.getOrElse(Seq())
 
@@ -15,14 +15,8 @@ class ParserTest extends munit.FunSuite {
       println(s"statementsの要素が3でない: ${stmts.length}")
       assert(false)
 
-    for ((stmt, ident) <- stmts.zip(Seq("x", "y", "foobar")))
-      assert {
-        contentOfTestLetStatements(stmt, ident) match
-          case None => true
-          case Some(err) =>
-            println(err)
-            false
-      }
+    for ((stmt, expected) <- stmts.zip(Seq("let x = 5;", "let y = 10;", "let foobar = (838382 + 1);")))
+      assertEquals(stmt.toStr, expected)
 
   }
 
