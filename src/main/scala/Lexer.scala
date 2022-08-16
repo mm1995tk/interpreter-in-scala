@@ -17,9 +17,9 @@ class Lexer private (input: String, cursor: Int):
 
       case ch: CodeLiteral => next -> ch.convertCharOfCodeToToken
 
-      case ch if ch.isDigit => this.readNumber(next)
+      case ch if ch.isDigit => this.readNumber(this.advanceCursor)
 
-      case ch if ch.isLetter => this.readIdentifier(next)
+      case ch if ch.isLetter => this.readIdentifier(this.advanceCursor)
       case 0                 => next -> Token.EOF
       case _                 => next -> Token.ILLEGAL
 
@@ -37,9 +37,9 @@ class Lexer private (input: String, cursor: Int):
   private def advanceCursor = new Lexer(this.input, this.cursor + 1)
 
   @tailrec
-  private def readIdentifier(next: Lexer, relativePos: Int = 0): (Lexer, Token) =
-    if !next.getChar.isLetter then
-      next.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
+  private def readIdentifier(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
+    if !lexer.getChar.isLetter then
+      lexer.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
         case "let"    => Token.LET
         case "return" => Token.RETURN
         case "if"     => Token.IF
@@ -49,15 +49,15 @@ class Lexer private (input: String, cursor: Int):
         case "fn"     => Token.FUNCTION
         case others   => Token.IDENT(others)
       )
-    else this.readIdentifier(next.advanceCursor, relativePos + 1)
+    else this.readIdentifier(lexer.advanceCursor, relativePos + 1)
 
   @tailrec
-  private def readNumber(next: Lexer, relativePos: Int = 0): (Lexer, Token.INT) =
-    if !next.getChar.isDigit then
-      next.skipWhitespace -> Token.INT {
+  private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.INT) =
+    if !lexer.getChar.isDigit then
+      lexer.skipWhitespace -> Token.INT {
         input.substring(this.cursor, this.cursor + 1 + relativePos).toInt
       }
-    else this.readNumber(next.advanceCursor, relativePos + 1)
+    else this.readNumber(lexer.advanceCursor, relativePos + 1)
 
 object Lexer:
   def apply(input: String): Lexer = new Lexer(input, 0).skipWhitespace
