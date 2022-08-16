@@ -157,16 +157,6 @@ class ParserTest extends munit.FunSuite {
   }
 }
 
-enum LetTestErr:
-  case NotLetStatement, NotMatchName
-
-def contentOfTestLetStatements(statement: Statement, name: String): Option[LetTestErr] =
-  statement match
-    case Statement.LET(Token.IDENT(value), _) => {
-      if value == name then None else Some(LetTestErr.NotMatchName)
-    }
-    case _ => Some(LetTestErr.NotLetStatement)
-
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
   (
     "-a * b",
