@@ -125,6 +125,39 @@ class ParserTest extends munit.FunSuite {
     }
 
   }
+
+  test("中置演算子のテスト") {
+    val input =
+      Seq("5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;").mkString
+    val parser = Parser(Lexer(input))
+    val stmts = parser.parseProgram.getOrElse(Seq())
+
+    if stmts.length != 8 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    assert(true)
+    val expecteds =
+      Seq(Token.PLUS, Token.MINUS, Token.ASTERISK, Token.SLASH, Token.GT, Token.LT, Token.EQ, Token.NotEQ)
+
+    stmts.zip(expecteds).foreach { (stmt, expected) =>
+      assertEquals(
+        stmt,
+        Statement.EXPR {
+          Expr.INFIX(expected, Expr.INT(Token.INT(5)), Expr.INT(Token.INT(5)))
+        }
+      )
+    }
+
+  }
+
+  test("異なる優先度の演算子が混在するテスト") {
+    for (test <- 異なる優先度の演算子が混在するテストのデータ)
+      val parser = Parser(Lexer(test._1))
+      val stmt = parser.parseProgram.getOrElse(Seq()).head
+
+      assertEquals(stmt, Statement.EXPR(test._2))
+  }
 }
 
 enum LetTestErr:
@@ -136,3 +169,141 @@ def contentOfTestLetStatements(statement: Statement, name: String): Option[LetTe
       if value == name then None else Some(LetTestErr.NotMatchName)
     }
     case _ => Some(LetTestErr.NotLetStatement)
+
+val 異なる優先度の演算子が混在するテストのデータ = Seq(
+  (
+    "-a * b",
+    Expr.INFIX(
+      Token.ASTERISK,
+      Expr.PREFIX(Token.MINUS, Expr.IDENT(Token.IDENT("a"))),
+      Expr.IDENT(Token.IDENT("b"))
+    )
+  ),
+  (
+    "!-a",
+    Expr.PREFIX(
+      Token.BANG,
+      Expr.PREFIX(Token.MINUS, Expr.IDENT(Token.IDENT("a")))
+    )
+  ),
+  (
+    "a + b+ c",
+    Expr.INFIX(
+      Token.PLUS,
+      Expr.INFIX(
+        Token.PLUS,
+        Expr.IDENT(Token.IDENT("a")),
+        Expr.IDENT(Token.IDENT("b"))
+      ),
+      Expr.IDENT(Token.IDENT("c"))
+    )
+  ),
+  (
+    "a+b - c",
+    Expr.INFIX(
+      Token.MINUS,
+      Expr.INFIX(
+        Token.PLUS,
+        Expr.IDENT(Token.IDENT("a")),
+        Expr.IDENT(Token.IDENT("b"))
+      ),
+      Expr.IDENT(Token.IDENT("c"))
+    )
+  ),
+  (
+    "a * b* c",
+    Expr.INFIX(
+      Token.ASTERISK,
+      Expr.INFIX(
+        Token.ASTERISK,
+        Expr.IDENT(Token.IDENT("a")),
+        Expr.IDENT(Token.IDENT("b"))
+      ),
+      Expr.IDENT(Token.IDENT("c"))
+    )
+  ),
+  (
+    "a * b / c",
+    Expr.INFIX(
+      Token.SLASH,
+      Expr.INFIX(
+        Token.ASTERISK,
+        Expr.IDENT(Token.IDENT("a")),
+        Expr.IDENT(Token.IDENT("b"))
+      ),
+      Expr.IDENT(Token.IDENT("c"))
+    )
+  ),
+  (
+    "a + b /c",
+    Expr.INFIX(
+      Token.PLUS,
+      Expr.IDENT(Token.IDENT("a")),
+      Expr.INFIX(
+        Token.SLASH,
+        Expr.IDENT(Token.IDENT("b")),
+        Expr.IDENT(Token.IDENT("c"))
+      )
+    )
+  ),
+  (
+    "a + b * c + d / e -f",
+    Expr.INFIX(
+      Token.MINUS,
+      Expr.INFIX(
+        Token.PLUS,
+        Expr.INFIX(
+          Token.PLUS,
+          Expr.IDENT(Token.IDENT("a")),
+          Expr.INFIX(
+            Token.ASTERISK,
+            Expr.IDENT(Token.IDENT("b")),
+            Expr.IDENT(Token.IDENT("c"))
+          )
+        ),
+        Expr.INFIX(
+          Token.SLASH,
+          Expr.IDENT(Token.IDENT("d")),
+          Expr.IDENT(Token.IDENT("e"))
+        )
+      ),
+      Expr.IDENT(Token.IDENT("f"))
+    )
+  ),
+  (
+    "5 > 4 == 3 < 4",
+    Expr.INFIX(
+      Token.EQ,
+      Expr.INFIX(Token.GT, Expr.INT(Token.INT(5)), Expr.INT(Token.INT(4))),
+      Expr.INFIX(Token.LT, Expr.INT(Token.INT(3)), Expr.INT(Token.INT(4)))
+    )
+  ),
+  (
+    "3 + 4 * 5 == 3 * 1 + 4 * 5",
+    Expr.INFIX(
+      Token.EQ,
+      Expr.INFIX(
+        Token.PLUS,
+        Expr.INT(Token.INT(3)),
+        Expr.INFIX(
+          Token.ASTERISK,
+          Expr.INT(Token.INT(4)),
+          Expr.INT(Token.INT(5))
+        )
+      ),
+      Expr.INFIX(
+        Token.PLUS,
+        Expr.INFIX(
+          Token.ASTERISK,
+          Expr.INT(Token.INT(3)),
+          Expr.INT(Token.INT(1))
+        ),
+        Expr.INFIX(
+          Token.ASTERISK,
+          Expr.INT(Token.INT(4)),
+          Expr.INT(Token.INT(5))
+        )
+      ),
+    )
+  )
+)

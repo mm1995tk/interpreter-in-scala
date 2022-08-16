@@ -39,11 +39,25 @@ sealed case class Parser private (
     nextParser -> result.map(Statement.EXPR(_))
 
   private def parseExpr(precedence: Precedence): ParserState[Expr] =
-    this.curToken match
-      case Token.IDENT(_)           => this.parseIdentifier
-      case Token.INT(_)             => this.parseIntLiteral
-      case Token.MINUS | Token.BANG => this.parsePrefixExpr
-      case _                        => this -> Left(ParserError.NotImplemented)
+    val leftExp: ParserState[Expr] = this.curToken match
+      case Token.IDENT(_) => this.parseIdentifier
+      case Token.INT(_)   => this.parseIntLiteral
+      case _: PrefixToken => this.parsePrefixExpr
+      case _              => this -> Left(ParserError.NotImplemented)
+
+    @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
+      val (parser, either) = item
+      either match
+        case Left(err) => parser -> Left(err)
+        case Right(expr) =>
+          parser.peekToken match
+            case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
+              go(parser.next.parseInfixExpr(expr))
+            case _ => item
+    end go
+    
+    go(leftExp)
+  end parseExpr
 
   private def parseIdentifier: ParserState[Expr] = this -> {
     this.curToken match
@@ -58,10 +72,17 @@ sealed case class Parser private (
   }
 
   private def parsePrefixExpr: ParserState[Expr] = this.curToken match
-    case ident @ (Token.MINUS | Token.BANG) =>
+    case ident: PrefixToken =>
       val (latestParser, expr) = this.next.parseExpr(Precedence.PREFIX)
       latestParser -> expr.map(Expr.PREFIX(ident, _))
-    case other => this -> Left(ParserError.UnexpectedToken(other, Token.IDENT("minus or bang")))
+    case other => this -> Left(ParserError.UnexpectedToken(other, Token.IDENT("prefix token")))
+
+  private def parseInfixExpr(left: Expr): ParserState[Expr] =
+    this.curToken match
+      case infixToken: InfixToken =>
+        val (latestParser, expr) = this.next.parseExpr(getInfixPrecedence(infixToken))
+        latestParser -> expr.map(Expr.INFIX(infixToken, left, _))
+      case other => this -> Left(ParserError.UnexpectedToken(other, Token.IDENT("infix token")))
 
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken
@@ -109,3 +130,13 @@ private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
   def >(target: Precedence) = this.ordinal > target.ordinal
   case LOWEST, EQUALS, LESSGREATER, SUM, PRODUCT, PREFIX, CALL
+
+private def getInfixPrecedence(token: InfixToken): Precedence = token match
+  case Token.PLUS     => Precedence.SUM
+  case Token.MINUS    => Precedence.SUM
+  case Token.ASTERISK => Precedence.PRODUCT
+  case Token.SLASH    => Precedence.PRODUCT
+  case Token.LT       => Precedence.LESSGREATER
+  case Token.GT       => Precedence.LESSGREATER
+  case Token.EQ       => Precedence.EQUALS
+  case Token.NotEQ    => Precedence.EQUALS
