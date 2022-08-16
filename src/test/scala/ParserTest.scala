@@ -1,9 +1,8 @@
 package parser
 
 import lexer.Lexer
-import ast.Statement
+import ast.*
 import token.Token
-import ast.Expr
 
 class ParserTest extends munit.FunSuite {
 
@@ -303,7 +302,30 @@ val 異なる優先度の演算子が混在するテストのデータ = Seq(
           Expr.INT(Token.INT(4)),
           Expr.INT(Token.INT(5))
         )
-      ),
+      )
     )
   )
 )
+
+// 以下、テストを楽にする仕込み
+
+trait Node[T]:
+  extension (t: T) def toStr: String
+
+given Node[Program] with
+  extension (p: Program) def toStr: String = p.map(_.toStr).mkString
+
+given Node[Statement] with
+  extension (t: Statement)
+    def toStr: String = t match
+      case Statement.LET(ident, expr) => ???
+      case Statement.RETURN(expr)     => ???
+      case Statement.EXPR(expr)       => ???
+
+given Node[Expr] with
+  extension (e: Expr)
+    def toStr: String = e match
+      case Expr.IDENT(ident)       => ???
+      case Expr.INT(ident)         => ???
+      case Expr.PREFIX(ident, r)   => ???
+      case Expr.INFIX(ident, r, l) => ???
