@@ -2,7 +2,7 @@ package parser
 
 import lexer.Lexer
 import ast.*
-import token.Token
+import token.*
 
 class ParserTest extends munit.FunSuite {
 
@@ -112,7 +112,7 @@ class ParserTest extends munit.FunSuite {
       println(s"statementsの要素が1でない: ${stmts.length}")
       assert(false)
 
-    val expecteds = Seq((Token.MINUS, 15), (Token.BANG, 5))
+    val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.MINUS, 15), (Token.BANG, 5))
 
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
@@ -136,10 +136,14 @@ class ParserTest extends munit.FunSuite {
       assert(false)
 
     assert(true)
-    val expecteds =
+    val expecteds: Seq[InfixToken] =
       Seq(Token.PLUS, Token.MINUS, Token.ASTERISK, Token.SLASH, Token.GT, Token.LT, Token.EQ, Token.NotEQ)
 
-    stmts.zip(expecteds).foreach { (stmt, expected) =>
+    val iter: Seq[(Statement, InfixToken)] = stmts.zip(expecteds)
+
+    iter.foreach { item =>
+      val stmt = item._1
+      val expected: InfixToken = item._2
       assertEquals(
         stmt,
         Statement.EXPR {
@@ -155,7 +159,7 @@ class ParserTest extends munit.FunSuite {
       val parser = Parser(Lexer(test._1))
       val stmt = parser.parseProgram.getOrElse(Seq()).head
 
-      assertEquals(stmt, Statement.EXPR(test._2))
+      assertEquals(stmt.toStr, test._2)
   }
 }
 
@@ -172,142 +176,45 @@ def contentOfTestLetStatements(statement: Statement, name: String): Option[LetTe
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
   (
     "-a * b",
-    Expr.INFIX(
-      Token.ASTERISK,
-      Expr.PREFIX(Token.MINUS, Expr.IDENT(Token.IDENT("a"))),
-      Expr.IDENT(Token.IDENT("b"))
-    )
+    "((-a) * b)"
   ),
   (
     "!-a",
-    Expr.PREFIX(
-      Token.BANG,
-      Expr.PREFIX(Token.MINUS, Expr.IDENT(Token.IDENT("a")))
-    )
+    "(!(-a))"
   ),
   (
     "a + b+ c",
-    Expr.INFIX(
-      Token.PLUS,
-      Expr.INFIX(
-        Token.PLUS,
-        Expr.IDENT(Token.IDENT("a")),
-        Expr.IDENT(Token.IDENT("b"))
-      ),
-      Expr.IDENT(Token.IDENT("c"))
-    )
+    "((a + b) + c)"
   ),
   (
     "a+b - c",
-    Expr.INFIX(
-      Token.MINUS,
-      Expr.INFIX(
-        Token.PLUS,
-        Expr.IDENT(Token.IDENT("a")),
-        Expr.IDENT(Token.IDENT("b"))
-      ),
-      Expr.IDENT(Token.IDENT("c"))
-    )
+    "((a + b) - c)"
   ),
   (
     "a * b* c",
-    Expr.INFIX(
-      Token.ASTERISK,
-      Expr.INFIX(
-        Token.ASTERISK,
-        Expr.IDENT(Token.IDENT("a")),
-        Expr.IDENT(Token.IDENT("b"))
-      ),
-      Expr.IDENT(Token.IDENT("c"))
-    )
+    "((a * b) * c)"
   ),
   (
     "a * b / c",
-    Expr.INFIX(
-      Token.SLASH,
-      Expr.INFIX(
-        Token.ASTERISK,
-        Expr.IDENT(Token.IDENT("a")),
-        Expr.IDENT(Token.IDENT("b"))
-      ),
-      Expr.IDENT(Token.IDENT("c"))
-    )
+    "((a * b) / c)"
   ),
   (
     "a + b /c",
-    Expr.INFIX(
-      Token.PLUS,
-      Expr.IDENT(Token.IDENT("a")),
-      Expr.INFIX(
-        Token.SLASH,
-        Expr.IDENT(Token.IDENT("b")),
-        Expr.IDENT(Token.IDENT("c"))
-      )
-    )
+    "(a + (b / c))"
   ),
   (
     "a + b * c + d / e -f",
-    Expr.INFIX(
-      Token.MINUS,
-      Expr.INFIX(
-        Token.PLUS,
-        Expr.INFIX(
-          Token.PLUS,
-          Expr.IDENT(Token.IDENT("a")),
-          Expr.INFIX(
-            Token.ASTERISK,
-            Expr.IDENT(Token.IDENT("b")),
-            Expr.IDENT(Token.IDENT("c"))
-          )
-        ),
-        Expr.INFIX(
-          Token.SLASH,
-          Expr.IDENT(Token.IDENT("d")),
-          Expr.IDENT(Token.IDENT("e"))
-        )
-      ),
-      Expr.IDENT(Token.IDENT("f"))
-    )
+    "(((a + (b * c)) + (d / e)) - f)"
   ),
   (
     "5 > 4 == 3 < 4",
-    Expr.INFIX(
-      Token.EQ,
-      Expr.INFIX(Token.GT, Expr.INT(Token.INT(5)), Expr.INT(Token.INT(4))),
-      Expr.INFIX(Token.LT, Expr.INT(Token.INT(3)), Expr.INT(Token.INT(4)))
-    )
+    "((5 > 4) == (3 < 4))"
   ),
   (
     "3 + 4 * 5 == 3 * 1 + 4 * 5",
-    Expr.INFIX(
-      Token.EQ,
-      Expr.INFIX(
-        Token.PLUS,
-        Expr.INT(Token.INT(3)),
-        Expr.INFIX(
-          Token.ASTERISK,
-          Expr.INT(Token.INT(4)),
-          Expr.INT(Token.INT(5))
-        )
-      ),
-      Expr.INFIX(
-        Token.PLUS,
-        Expr.INFIX(
-          Token.ASTERISK,
-          Expr.INT(Token.INT(3)),
-          Expr.INT(Token.INT(1))
-        ),
-        Expr.INFIX(
-          Token.ASTERISK,
-          Expr.INT(Token.INT(4)),
-          Expr.INT(Token.INT(5))
-        )
-      )
-    )
+    "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"
   )
 )
-
-// 以下、テストを楽にする仕込み
 
 trait Node[T]:
   extension (t: T) def toStr: String
@@ -318,14 +225,44 @@ given Node[Program] with
 given Node[Statement] with
   extension (t: Statement)
     def toStr: String = t match
-      case Statement.LET(ident, expr) => ???
-      case Statement.RETURN(expr)     => ???
-      case Statement.EXPR(expr)       => ???
+      case Statement.LET(ident, expr) => s"let ${ident.showLiteral} = ${expr.toStr};"
+      case Statement.RETURN(expr)     => s"return ${expr.toStr};"
+      case Statement.EXPR(expr)       => expr.toStr
 
 given Node[Expr] with
   extension (e: Expr)
     def toStr: String = e match
-      case Expr.IDENT(ident)       => ???
-      case Expr.INT(ident)         => ???
-      case Expr.PREFIX(ident, r)   => ???
-      case Expr.INFIX(ident, r, l) => ???
+      case Expr.IDENT(ident)       => ident.showLiteral
+      case Expr.INT(ident)         => ident.showLiteral
+      case Expr.PREFIX(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
+      case Expr.INFIX(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
+
+extension (token: Token)
+  def showLiteral: String = token match
+    case Token.ILLEGAL              => 0.toChar.toString()
+    case Token.EOF                  => 0.toChar.toString()
+    case Token.ASSIGN               => "="
+    case Token.PLUS                 => "+"
+    case Token.MINUS                => "-"
+    case Token.BANG                 => "!"
+    case Token.ASTERISK             => "*"
+    case Token.SLASH                => "/"
+    case Token.LT                   => "<"
+    case Token.GT                   => ">"
+    case Token.EQ                   => "=="
+    case Token.NotEQ                => "!="
+    case Token.COMMA                => ","
+    case Token.SEMICOLON            => ";"
+    case Token.LPAREN               => "("
+    case Token.RPAREN               => ")"
+    case Token.LBRACE               => "{"
+    case Token.RBRACE               => "}"
+    case Token.FUNCTION             => "function"
+    case Token.LET                  => "let"
+    case Token.TRUE                 => "true"
+    case Token.FALSE                => "false"
+    case Token.IF                   => "if"
+    case Token.ELSE                 => "else"
+    case Token.RETURN               => "return"
+    case Token.IDENT(value: String) => value
+    case Token.INT(value: Int)      => value.toString()

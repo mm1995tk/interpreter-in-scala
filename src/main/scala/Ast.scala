@@ -1,6 +1,6 @@
 package ast
 
-import token.Token
+import token.*
 
 type Program = Seq[Statement]
 
@@ -12,7 +12,7 @@ enum Statement:
 enum Expr:
   case IDENT(ident: Ident)
   case INT(ident: Token.INT)
-  case PREFIX(ident: Token, right: Expr)
-  case INFIX(ident: Token, left: Expr, right: Expr)
+  case PREFIX(ident: PrefixToken, right: Expr)
+  case INFIX(ident: InfixToken, left: Expr, right: Expr)
 
 private type Ident = Token.IDENT
