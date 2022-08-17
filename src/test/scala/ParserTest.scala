@@ -191,9 +191,19 @@ val 異なる優先度の演算子が混在するテストのデータ = Seq(
     "((5 > 4) == (3 < 4))"
   ),
   (
+    "5 > 4 == true",
+    "((5 > 4) == true)"
+  ),
+  (
     "3 + 4 * 5 == 3 * 1 + 4 * 5",
     "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"
-  )
+  ),
+  (
+    "false == 3 * 1 + 4 * 5",
+    "(false == ((3 * 1) + (4 * 5)))"
+  ),
+  ("!true", "(!true)"),
+  ("(5+5) * 7", "((5 + 5) * 7)")
 )
 
 trait Node[T]:
@@ -216,6 +226,7 @@ given Node[Expr] with
       case Expr.INT(ident)         => ident.showLiteral
       case Expr.PREFIX(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
       case Expr.INFIX(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
+      case Expr.Bool(token)        => token.equals(Token.TRUE).toString()
 
 extension (token: Token)
   def showLiteral: String = token match

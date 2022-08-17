@@ -14,5 +14,6 @@ enum Expr:
   case INT(ident: Token.INT)
   case PREFIX(ident: PrefixToken, right: Expr)
   case INFIX(ident: InfixToken, left: Expr, right: Expr)
+  case Bool(token: BoolToken)
 
 private type Ident = Token.IDENT

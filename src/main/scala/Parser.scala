@@ -46,6 +46,8 @@ sealed case class Parser private (
       case Token.IDENT(_) => this.parseIdentifier
       case Token.INT(_)   => this.parseIntLiteral
       case _: PrefixToken => this.parsePrefixExpr
+      case _: BoolToken   => this.parseBool
+      case Token.LPAREN   => this.parseGroupExpr
       case _              => this -> Left(ParserError.NotImplemented)
 
     @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
@@ -86,6 +88,18 @@ sealed case class Parser private (
         val (latestParser, expr) = this.next.parseExpr(getInfixPrecedence(infixToken))
         latestParser -> expr.map(Expr.INFIX(infixToken, left, _))
       case other => this -> Left(ParserError.UnexpectedToken(other, Token.IDENT("infix token")))
+
+  private def parseBool: ParserState[Expr] = this -> {
+    this.curToken match
+      case token: BoolToken => Right(Expr.Bool(token))
+      case other            => Left(ParserError.UnexpectedToken(other, Token.IDENT("bool token")))
+  }
+
+  private def parseGroupExpr: ParserState[Expr] =
+    val (latestParser, expr) = this.next.parseExpr(Precedence.LOWEST)
+    latestParser.peekToken match
+      case Token.RPAREN => latestParser.next -> expr
+      case other        => this -> Left(ParserError.UnexpectedToken(other, Token.RPAREN))
 
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken
