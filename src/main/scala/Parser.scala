@@ -1,10 +1,8 @@
 package parser
 
-import cats.data.{Reader, Kleisli}
 import ast.*
 import lexer.*
 import token.*
-import cats.data.State
 import scala.annotation.tailrec
 
 sealed case class Parser private (
