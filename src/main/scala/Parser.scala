@@ -26,16 +26,16 @@ sealed case class Parser private (
         if nextParser.peekToken != Token.Assign then
           nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.Assign))
         else
-          val (latestParser, eitherExpr) = nextParser.next.next.parseExpr(Precedence.LOWEST)
+          val (latestParser, eitherExpr) = nextParser.next.next.parseExpr(Precedence.Lowest)
           latestParser.next -> eitherExpr.map(Statement.Let(ident, _))
       case token => this -> Left(ParserError.UnexpectedToken(token, Token.Ident("variable names")))
 
   private def parseReturnStatement: ParserState[Statement] =
-    val (latestParser, eitherExpr) = this.next.parseExpr(Precedence.LOWEST)
+    val (latestParser, eitherExpr) = this.next.parseExpr(Precedence.Lowest)
     latestParser.next -> eitherExpr.map(Statement.Return(_))
 
   private def parseExprStatement: ParserState[Statement] =
-    val (parser, result) = this.parseExpr(Precedence.LOWEST)
+    val (parser, result) = this.parseExpr(Precedence.Lowest)
     val nextParser = if parser.peekToken.equals(Token.Semicolon) then parser.next else parser
     nextParser -> result.map(Statement.Expr(_))
 
@@ -94,7 +94,7 @@ sealed case class Parser private (
   }
 
   private def parseGroupExpr: ParserState[Expr] =
-    val (latestParser, expr) = this.next.parseExpr(Precedence.LOWEST)
+    val (latestParser, expr) = this.next.parseExpr(Precedence.Lowest)
     latestParser.peekToken match
       case Token.RightParen => latestParser.next -> expr
       case other            => this -> Left(ParserError.UnexpectedToken(other, Token.RightParen))
@@ -144,14 +144,14 @@ private type ParserErrors = Seq[ParserError]
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
   def >(target: Precedence) = this.ordinal > target.ordinal
-  case LOWEST, EqUALS, LESSGREATER, SUM, PRODUCT, Prefix, CALL
+  case Lowest, Equals, LessOrGreater, Sum, Product, Prefix, Call
 
 private def getInfixPrecedence(token: InfixToken): Precedence = token match
-  case Token.Plus     => Precedence.SUM
-  case Token.Minus    => Precedence.SUM
-  case Token.Asterisk => Precedence.PRODUCT
-  case Token.Slash    => Precedence.PRODUCT
-  case Token.Lt       => Precedence.LESSGREATER
-  case Token.Gt       => Precedence.LESSGREATER
-  case Token.Eq       => Precedence.EqUALS
-  case Token.NotEq    => Precedence.EqUALS
+  case Token.Plus     => Precedence.Sum
+  case Token.Minus    => Precedence.Sum
+  case Token.Asterisk => Precedence.Product
+  case Token.Slash    => Precedence.Product
+  case Token.Lt       => Precedence.LessOrGreater
+  case Token.Gt       => Precedence.LessOrGreater
+  case Token.Eq       => Precedence.Equals
+  case Token.NotEq    => Precedence.Equals
