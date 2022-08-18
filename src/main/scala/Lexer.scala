@@ -8,20 +8,20 @@ class Lexer private (input: String, cursor: Int):
     val next = this.next
     this.getChar match
       case '=' =>
-        if next.getChar == '=' then next.next -> Token.EQ
-        else next -> Token.ASSIGN
+        if next.getChar == '=' then next.next -> Token.Eq
+        else next -> Token.Assign
 
       case '!' =>
-        if next.getChar == '=' then next.next -> Token.NotEQ
-        else next -> Token.BANG
+        if next.getChar == '=' then next.next -> Token.NotEq
+        else next -> Token.Bang
 
       case ch: CodeLiteral => next -> ch.convertCharOfCodeToToken
 
       case ch if ch.isDigit => this.readNumber(this.advanceCursor)
 
       case ch if ch.isLetter => this.readIdentifier(this.advanceCursor)
-      case 0                 => next -> Token.EOF
-      case _                 => next -> Token.ILLEGAL
+      case 0                 => next -> Token.Eof
+      case _                 => next -> Token.Illegal
 
   private def next = this.advanceCursor.skipWhitespace
 
@@ -40,21 +40,21 @@ class Lexer private (input: String, cursor: Int):
   private def readIdentifier(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
     if !lexer.getChar.isLetter then
       lexer.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
-        case "let"    => Token.LET
-        case "return" => Token.RETURN
-        case "if"     => Token.IF
-        case "else"   => Token.ELSE
-        case "true"   => Token.TRUE
-        case "false"  => Token.FALSE
-        case "fn"     => Token.FUNCTION
-        case others   => Token.IDENT(others)
+        case "let"    => Token.Let
+        case "return" => Token.Return
+        case "if"     => Token.If
+        case "else"   => Token.Else
+        case "true"   => Token.True
+        case "false"  => Token.False
+        case "fn"     => Token.Function
+        case others   => Token.Ident(others)
       )
     else this.readIdentifier(lexer.advanceCursor, relativePos + 1)
 
   @tailrec
-  private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.INT) =
+  private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
     if !lexer.getChar.isDigit then
-      lexer.skipWhitespace -> Token.INT {
+      lexer.skipWhitespace -> Token.Int {
         input.substring(this.cursor, this.cursor + 1 + relativePos).toInt
       }
     else this.readNumber(lexer.advanceCursor, relativePos + 1)
@@ -71,15 +71,15 @@ private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' |
 extension (item: CodeLiteral)
   private def convertCharOfCodeToToken =
     item match
-      case '+' => Token.PLUS
-      case '-' => Token.MINUS
-      case '/' => Token.SLASH
-      case '*' => Token.ASTERISK
-      case '<' => Token.LT
-      case '>' => Token.GT
-      case '(' => Token.LPAREN
-      case ')' => Token.RPAREN
-      case '{' => Token.LBRACE
-      case '}' => Token.RBRACE
-      case ',' => Token.COMMA
-      case ';' => Token.SEMICOLON
+      case '+' => Token.Plus
+      case '-' => Token.Minus
+      case '/' => Token.Slash
+      case '*' => Token.Asterisk
+      case '<' => Token.Lt
+      case '>' => Token.Gt
+      case '(' => Token.LeftParen
+      case ')' => Token.RightParen
+      case '{' => Token.LeftBrace
+      case '}' => Token.RightBrace
+      case ',' => Token.Comma
+      case ';' => Token.Semicolon

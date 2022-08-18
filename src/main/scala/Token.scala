@@ -1,38 +1,38 @@
 package token
 
 enum Token:
-  case ILLEGAL,
-    EOF,
-    ASSIGN,
-    PLUS,
-    MINUS,
-    BANG,
-    ASTERISK,
-    SLASH,
-    LT,
-    GT,
-    EQ,
-    NotEQ,
-    COMMA,
-    SEMICOLON,
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
-    FUNCTION,
-    LET,
-    TRUE,
-    FALSE,
-    IF,
-    ELSE,
-    RETURN
-  case IDENT(value: String)
-  case INT(value: Int)
+  case Illegal,
+    Eof,
+    Assign,
+    Plus,
+    Minus,
+    Bang,
+    Asterisk,
+    Slash,
+    Lt,
+    Gt,
+    Eq,
+    NotEq,
+    Comma,
+    Semicolon,
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Function,
+    Let,
+    True,
+    False,
+    If,
+    Else,
+    Return
+  case Ident(value: String)
+  case Int(value: scala.Int)
 
-type PrefixToken = Token.MINUS.type | Token.BANG.type
+type PrefixToken = Token.Minus.type | Token.Bang.type
 
 type InfixToken =
-  Token.PLUS.type | Token.MINUS.type | Token.ASTERISK.type | Token.SLASH.type | Token.LT.type |
-    Token.GT.type | Token.EQ.type | Token.NotEQ.type
+  Token.Plus.type | Token.Minus.type | Token.Asterisk.type | Token.Slash.type | Token.Lt.type |
+    Token.Gt.type | Token.Eq.type | Token.NotEq.type
 
-type BoolToken = Token.TRUE.type | Token.FALSE.type
+type BoolToken = Token.True.type | Token.False.type

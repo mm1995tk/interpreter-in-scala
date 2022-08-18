@@ -31,14 +31,14 @@ class ParserTest extends munit.FunSuite {
         assertEquals(
           seq.filterNot(_.equals(ParserError.NotImplemented)),
           Seq(
-            ParserError.UnexpectedToken(Token.INT(5), Token.ASSIGN),
+            ParserError.UnexpectedToken(Token.Int(5), Token.Assign),
             ParserError.UnexpectedToken(
-              Token.ASSIGN,
-              Token.IDENT("variable names")
+              Token.Assign,
+              Token.Ident("variable names")
             ),
             ParserError.UnexpectedToken(
-              Token.INT(838383),
-              Token.IDENT("variable names")
+              Token.Int(838383),
+              Token.Ident("variable names")
             )
           )
         )
@@ -70,7 +70,7 @@ class ParserTest extends munit.FunSuite {
 
     val stmt = stmts.head
     assert(stmt match
-      case Statement.EXPR(Expr.IDENT(Token.IDENT(value))) => value == "foobar"
+      case Statement.Expr(Expr.Ident(Token.Ident(value))) => value == "foobar"
       case _                                              => false
     )
 
@@ -87,7 +87,7 @@ class ParserTest extends munit.FunSuite {
 
     val stmt = stmts.head
     assert(stmt match
-      case Statement.EXPR(Expr.INT(Token.INT(value))) => value == 5
+      case Statement.Expr(Expr.Int(Token.Int(value))) => value == 5
       case _                                          => false
     )
 
@@ -102,13 +102,13 @@ class ParserTest extends munit.FunSuite {
       println(s"statementsの要素が1でない: ${stmts.length}")
       assert(false)
 
-    val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.MINUS, 15), (Token.BANG, 5))
+    val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.Minus, 15), (Token.Bang, 5))
 
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
         stmt,
-        Statement.EXPR {
-          Expr.PREFIX(expected._1, Expr.INT(Token.INT(expected._2)))
+        Statement.Expr {
+          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
         }
       )
     }
@@ -127,7 +127,7 @@ class ParserTest extends munit.FunSuite {
 
     assert(true)
     val expecteds: Seq[InfixToken] =
-      Seq(Token.PLUS, Token.MINUS, Token.ASTERISK, Token.SLASH, Token.GT, Token.LT, Token.EQ, Token.NotEQ)
+      Seq(Token.Plus, Token.Minus, Token.Asterisk, Token.Slash, Token.Gt, Token.Lt, Token.Eq, Token.NotEq)
 
     val iter: Seq[(Statement, InfixToken)] = stmts.zip(expecteds)
 
@@ -136,8 +136,8 @@ class ParserTest extends munit.FunSuite {
       val expected: InfixToken = item._2
       assertEquals(
         stmt,
-        Statement.EXPR {
-          Expr.INFIX(expected, Expr.INT(Token.INT(5)), Expr.INT(Token.INT(5)))
+        Statement.Expr {
+          Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5)))
         }
       )
     }
@@ -215,45 +215,45 @@ given Node[Program] with
 given Node[Statement] with
   extension (t: Statement)
     def toStr: String = t match
-      case Statement.LET(ident, expr) => s"let ${ident.showLiteral} = ${expr.toStr};"
-      case Statement.RETURN(expr)     => s"return ${expr.toStr};"
-      case Statement.EXPR(expr)       => expr.toStr
+      case Statement.Let(ident, expr) => s"let ${ident.showLiteral} = ${expr.toStr};"
+      case Statement.Return(expr)     => s"return ${expr.toStr};"
+      case Statement.Expr(expr)       => expr.toStr
 
 given Node[Expr] with
   extension (e: Expr)
     def toStr: String = e match
-      case Expr.IDENT(ident)       => ident.showLiteral
-      case Expr.INT(ident)         => ident.showLiteral
-      case Expr.PREFIX(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
-      case Expr.INFIX(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
-      case Expr.Bool(token)        => token.equals(Token.TRUE).toString()
+      case Expr.Ident(ident)       => ident.showLiteral
+      case Expr.Int(ident)         => ident.showLiteral
+      case Expr.Prefix(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
+      case Expr.Infix(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
+      case Expr.Bool(token)        => token.equals(Token.True).toString()
 
 extension (token: Token)
   def showLiteral: String = token match
-    case Token.ILLEGAL              => 0.toChar.toString()
-    case Token.EOF                  => 0.toChar.toString()
-    case Token.ASSIGN               => "="
-    case Token.PLUS                 => "+"
-    case Token.MINUS                => "-"
-    case Token.BANG                 => "!"
-    case Token.ASTERISK             => "*"
-    case Token.SLASH                => "/"
-    case Token.LT                   => "<"
-    case Token.GT                   => ">"
-    case Token.EQ                   => "=="
-    case Token.NotEQ                => "!="
-    case Token.COMMA                => ","
-    case Token.SEMICOLON            => ";"
-    case Token.LPAREN               => "("
-    case Token.RPAREN               => ")"
-    case Token.LBRACE               => "{"
-    case Token.RBRACE               => "}"
-    case Token.FUNCTION             => "function"
-    case Token.LET                  => "let"
-    case Token.TRUE                 => "true"
-    case Token.FALSE                => "false"
-    case Token.IF                   => "if"
-    case Token.ELSE                 => "else"
-    case Token.RETURN               => "return"
-    case Token.IDENT(value: String) => value
-    case Token.INT(value: Int)      => value.toString()
+    case Token.Illegal              => 0.toChar.toString()
+    case Token.Eof                  => 0.toChar.toString()
+    case Token.Assign               => "="
+    case Token.Plus                 => "+"
+    case Token.Minus                => "-"
+    case Token.Bang                 => "!"
+    case Token.Asterisk             => "*"
+    case Token.Slash                => "/"
+    case Token.Lt                   => "<"
+    case Token.Gt                   => ">"
+    case Token.Eq                   => "=="
+    case Token.NotEq                => "!="
+    case Token.Comma                => ","
+    case Token.Semicolon            => ";"
+    case Token.LeftParen            => "("
+    case Token.RightParen           => ")"
+    case Token.LeftBrace            => "{"
+    case Token.RightBrace           => "}"
+    case Token.Function             => "function"
+    case Token.Let                  => "let"
+    case Token.True                 => "true"
+    case Token.False                => "false"
+    case Token.If                   => "if"
+    case Token.Else                 => "else"
+    case Token.Return               => "return"
+    case Token.Ident(value: String) => value
+    case Token.Int(value: Int)      => value.toString()

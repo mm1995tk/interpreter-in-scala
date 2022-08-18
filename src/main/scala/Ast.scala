@@ -5,15 +5,13 @@ import token.*
 type Program = Seq[Statement]
 
 enum Statement:
-  case LET(ident: Ident, expr: Expr)
-  case RETURN(expr: Expr)
-  case EXPR(expr: Expr)
+  case Let(ident: Token.Ident, expr: ast.Expr)
+  case Return(expr: ast.Expr)
+  case Expr(expr: ast.Expr)
 
 enum Expr:
-  case IDENT(ident: Ident)
-  case INT(ident: Token.INT)
-  case PREFIX(ident: PrefixToken, right: Expr)
-  case INFIX(ident: InfixToken, left: Expr, right: Expr)
+  case Ident(token: Token.Ident)
+  case Int(token: Token.Int)
+  case Prefix(token: PrefixToken, right: Expr)
+  case Infix(token: InfixToken, left: Expr, right: Expr)
   case Bool(token: BoolToken)
-
-private type Ident = Token.IDENT

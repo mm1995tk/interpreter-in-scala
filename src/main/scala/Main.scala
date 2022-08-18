@@ -24,7 +24,7 @@ def repl: Unit =
 
 def loop(lexer: Lexer): Unit =
   val (next, token) = lexer.getToken
-  if (token == Token.EOF) {
+  if (token == Token.Eof) {
     println("");
     return
   }
