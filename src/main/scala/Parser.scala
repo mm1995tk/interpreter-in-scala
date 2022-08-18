@@ -116,18 +116,18 @@ object Parser:
   @tailrec
   private def parseProgram(
       parser: Parser,
-      result: Either[ParserErrors, Program] = Right(Seq())
+      acc: Either[ParserErrors, Program] = Right(Seq())
   ): Either[ParserErrors, Program] =
-    if parser.curToken.equals(Token.Eof) then result
+    if parser.curToken.equals(Token.Eof) then acc
     else
       val parsed = parser.parseStatement
       parsed._2 match
-        case Right(stmt) => parseProgram(parsed._1.next, result.map(_ :+ stmt))
+        case Right(stmt) => parseProgram(parsed._1.next, acc.map(_ :+ stmt))
         case Left(err) =>
           parseProgram(
             parsed._1.next,
             Left {
-              result match
+              acc match
                 case Left(seq) => seq :+ err
                 case _         => Seq(err)
             }
