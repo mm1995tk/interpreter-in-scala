@@ -27,7 +27,7 @@ class Lexer private (input: String, cursor: Int):
 
   @tailrec
   private def skipWhitespace: Lexer =
-    if this.getChar.isAsciiWhitespace then this.advanceCursor.skipWhitespace
+    if this.getChar.isWhitespace then this.advanceCursor.skipWhitespace
     else this
 
   private def getChar =
@@ -61,11 +61,6 @@ class Lexer private (input: String, cursor: Int):
 
 object Lexer:
   def apply(input: String): Lexer = new Lexer(input, 0).skipWhitespace
-
-extension (item: Char)
-  private def isAsciiWhitespace: Boolean = item match
-    case ' ' | '\n' | '\t' | '\r' => true
-    case _                        => false
 
 private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | ',' | ';'
 extension (item: CodeLiteral)
