@@ -45,10 +45,10 @@ sealed case class Parser private (
     val leftExp: ParserState[Expr] = this.curToken match
       case Token.Ident(_)  => this.parseIdentifier
       case Token.Int(_)    => this.parseIntLiteral
-      case _: PrefixToken  => this.parsePrefixExpr
-      case _: BoolToken    => this.parseBoolExpr
       case Token.If        => this.parseIfExpr
       case Token.LeftParen => this.parseGroupExpr
+      case _: PrefixToken  => this.parsePrefixExpr
+      case _: BoolToken    => this.parseBoolExpr
       case _               => this -> Left(ParserError.NotImplemented)
 
     @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
