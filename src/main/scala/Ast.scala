@@ -8,7 +8,6 @@ enum Statement:
   case Let(ident: Token.Ident, expr: ast.Expr)
   case Return(expr: ast.Expr)
   case Expr(expr: ast.Expr)
-  case Block(stmts: Program)
 
 enum Expr:
   case Ident(token: Token.Ident)

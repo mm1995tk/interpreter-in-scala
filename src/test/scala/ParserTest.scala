@@ -224,7 +224,6 @@ given Node[Statement] with
       case Statement.Let(ident, expr) => s"let ${ident.showLiteral} = ${expr.toStr};"
       case Statement.Return(expr)     => s"return ${expr.toStr};"
       case Statement.Expr(expr)       => expr.toStr
-      case Statement.Block(stmts)     => stmts.toStr
 
 given Node[Expr] with
   extension (e: Expr)
