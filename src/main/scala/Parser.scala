@@ -143,9 +143,10 @@ sealed case class Parser private (
     val (nextLexer, token) = lexer.getToken
     this.copy(lexer = nextLexer, curToken = this.peekToken, peekToken = token)
 
-  @tailrec
-  private def skipToSemicolon: Parser =
+  @tailrec private def skipToSemicolon: Parser =
     if this.curToken == Token.Semicolon then this else this.next.skipToSemicolon
+
+end Parser
 
 object Parser:
   def apply(lexer: Lexer) =
@@ -153,8 +154,7 @@ object Parser:
     val (thirdLexer, peekToken) = secondLexer.getToken
     new Parser(thirdLexer, curToken, peekToken)
 
-  @tailrec
-  private def parseProgram(
+  @tailrec private def parseProgram(
       parser: Parser,
       endToken: Token = Token.Eof,
       acc: Either[ParserErrors, Program] = Right(Seq())
