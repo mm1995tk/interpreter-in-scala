@@ -12,7 +12,7 @@ sealed case class Parser private (
     private val peekToken: Token
 ):
 
-  def parseProgram(token: Token = Token.Eof): Either[ParserErrors, Program] =
+  def parseProgram(token: Token = Token.Eof): ParserState[Program] =
     Parser.parseProgram(this, token)
 
   private def parseStatement: ParserState[Statement] =
@@ -98,23 +98,36 @@ sealed case class Parser private (
 
   private def parseIfExpr: ParserState[Expr] =
     if !this.peekToken.equals(Token.LeftParen) then
-      this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
-    else
-      val (latestParser, eitherCond) = this.next.parseExpr(Precedence.Lowest)
-      val valid = eitherCond.flatMap(expr =>
-        if latestParser.curToken.equals(Token.RightParen) && latestParser.peekToken.equals(Token.LeftBrace)
-        then Right(expr)
-        else if latestParser.curToken.equals(Token.RightParen) then
-          Left(ParserError.UnexpectedToken(latestParser.curToken, Token.RightParen))
-        else Left(ParserError.UnexpectedToken(latestParser.peekToken, Token.LeftBrace))
-      )
-      val finalParser = latestParser.next.next
+      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
 
-      val r = for {
-        cond <- valid
-        conseq <- finalParser.parseProgram(Token.RightBrace)
-      } yield Expr.If(cond, conseq, None)
-      finalParser.skipToRightBrace.next -> r
+    val (parser, notValidatedEitherCond) = this.next.parseExpr(Precedence.Lowest)
+    val validatedEitherCond = notValidatedEitherCond.flatMap(expr =>
+      val rBool = parser.curToken.equals(Token.RightParen)
+      if rBool && parser.peekToken.equals(Token.LeftBrace) then Right(expr)
+      else if rBool then Left(ParserError.UnexpectedToken(parser.curToken, Token.RightParen))
+      else Left(ParserError.UnexpectedToken(parser.peekToken, Token.LeftBrace))
+    )
+
+    val (parsedByIf, eitherConseq) = parser.next.next.parseProgram(Token.RightBrace)
+
+    val (parsedByElse, eitherAlter): ParserState[Option[Program]] =
+      val isElseToken = (p: Parser) => p.curToken.equals(Token.Else)
+      val next = parsedByIf.next
+      if isElseToken(next) && next.peekToken.equals(Token.LeftBrace) then
+        val (parser, alter) = next.next.next.parseProgram(Token.RightBrace)
+        parser -> alter.map(Some(_))
+      else if isElseToken(parsedByIf) then
+        parsedByIf -> Left(ParserError.UnexpectedToken(parsedByIf.peekToken, Token.LeftBrace))
+      else parsedByIf -> Right(None)
+
+    parsedByElse -> {
+      for {
+        cond <- validatedEitherCond
+        conseq <- eitherConseq
+        alter <- eitherAlter
+      } yield Expr.If(cond, conseq, alter)
+    }
+  end parseIfExpr
 
   private def skipToRightBrace: Parser =
     if this.curToken.equals(Token.RightBrace) then this else this.next.skipToRightBrace
@@ -144,9 +157,9 @@ object Parser:
       parser: Parser,
       endToken: Token = Token.Eof,
       acc: Either[ParserErrors, Program] = Right(Seq())
-  ): Either[ParserErrors, Program] =
+  ): ParserState[Program] =
     if parser.curToken.equals(Token.Eof) || parser.curToken.equals(endToken)
-    then acc
+    then parser -> acc
     else
       val parsed = parser.parseStatement
       parsed._2 match
