@@ -4,7 +4,6 @@ import ast.*
 import lexer.*
 import token.*
 import scala.annotation.tailrec
-import scala.collection.immutable.LazyList.cons
 
 sealed case class Parser private (
     private val lexer: Lexer,
