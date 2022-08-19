@@ -9,7 +9,7 @@ class ParserTest extends munit.FunSuite {
   test("let文のテスト") {
     val input = "let x = 5;\nlet y = 10;\nlet foobar = 838382+1;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 3 then
       println(s"statementsの要素が3でない: ${stmts.length}")
@@ -23,14 +23,14 @@ class ParserTest extends munit.FunSuite {
   test("let文解析エラーのテスト") {
     val input = "let x  5;\nlet  = 10;\nlet 838383;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram
+    val stmts = parser.parseProgram()._2
 
     stmts match
       case Right(_) => assert(false)
       case Left(seq) =>
         assertEquals(
-          seq.filterNot(_.equals(ParserError.NotImplemented)),
-          Seq(
+          seq.lift.filterNot(_.equals(ParserError.NotImplemented)),
+          List(
             ParserError.UnexpectedToken(Token.Int(5), Token.Assign),
             ParserError.UnexpectedToken(
               Token.Assign,
@@ -48,7 +48,7 @@ class ParserTest extends munit.FunSuite {
   test("return文のテスト") {
     val input = "return  5;\nreturn 15+5-10;\nreturn 838383;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 3 then
       println(s"statementsの要素が3でない: ${stmts.length}")
@@ -62,7 +62,7 @@ class ParserTest extends munit.FunSuite {
   test("識別子のテスト") {
     val input = "foobar;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 1 then
       println(s"statementsの要素が1でない: ${stmts.length}")
@@ -79,7 +79,7 @@ class ParserTest extends munit.FunSuite {
   test("整数リテラルのテスト") {
     val input = "5;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 1 then
       println(s"statementsの要素が1でない: ${stmts.length}")
@@ -96,7 +96,7 @@ class ParserTest extends munit.FunSuite {
   test("前置演算子のテスト") {
     val input = "-15;!5;"
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 2 then
       println(s"statementsの要素が1でない: ${stmts.length}")
@@ -119,7 +119,7 @@ class ParserTest extends munit.FunSuite {
     val input =
       Seq("5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;").mkString
     val parser = Parser(Lexer(input))
-    val stmts = parser.parseProgram.getOrElse(Seq())
+    val stmts = parser.parseProgram()._2.getOrElse(Seq())
 
     if stmts.length != 8 then
       println(s"statementsの要素が1でない: ${stmts.length}")
@@ -147,9 +147,15 @@ class ParserTest extends munit.FunSuite {
   test("異なる優先度の演算子が混在するテスト") {
     for (test <- 異なる優先度の演算子が混在するテストのデータ)
       val parser = Parser(Lexer(test._1))
-      val stmt = parser.parseProgram.getOrElse(Seq()).head
+      val stmt = parser.parseProgram()._2.getOrElse(Seq()).head
 
       assertEquals(stmt.toStr, test._2)
+  }
+
+  test("if式のテスト") {
+    val parser = Parser(Lexer("if (5 > 3) {let k = 2;return k + 1;} else {let k = 7;return k + 1;}"))
+    val stmt = parser.parseProgram()._2.getOrElse(Seq()).head
+    assertEquals(stmt.toStr, "if ((5 > 3)) {let k = 2;return (k + 1);} else {let k = 7;return (k + 1);}")
   }
 }
 
@@ -218,6 +224,7 @@ given Node[Statement] with
       case Statement.Let(ident, expr) => s"let ${ident.showLiteral} = ${expr.toStr};"
       case Statement.Return(expr)     => s"return ${expr.toStr};"
       case Statement.Expr(expr)       => expr.toStr
+      case Statement.Block(stmts)     => stmts.toStr
 
 given Node[Expr] with
   extension (e: Expr)
@@ -227,6 +234,11 @@ given Node[Expr] with
       case Expr.Prefix(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
       case Expr.Infix(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
       case Expr.Bool(token)        => token.equals(Token.True).toString()
+      case Expr.If(cond, conseq, alter) =>
+        s"if (${cond.toStr}) {${conseq.toStr}} ${alter match
+            case Some(v) => s"else {${v.toStr}}"
+            case None    => ""
+          }"
 
 extension (token: Token)
   def showLiteral: String = token match
