@@ -4,6 +4,7 @@ import ast.*
 import lexer.*
 import token.*
 import scala.annotation.tailrec
+import scala.collection.immutable.LazyList.cons
 
 sealed case class Parser private (
     private val lexer: Lexer,
@@ -11,7 +12,8 @@ sealed case class Parser private (
     private val peekToken: Token
 ):
 
-  def parseProgram: Either[ParserErrors, Program] = Parser.parseProgram(this)
+  def parseProgram(token: Token = Token.Eof): Either[ParserErrors, Program] =
+    Parser.parseProgram(this, token)
 
   private def parseStatement: ParserState[Statement] =
     this.curToken match
@@ -44,7 +46,8 @@ sealed case class Parser private (
       case Token.Ident(_)  => this.parseIdentifier
       case Token.Int(_)    => this.parseIntLiteral
       case _: PrefixToken  => this.parsePrefixExpr
-      case _: BoolToken    => this.parseBool
+      case _: BoolToken    => this.parseBoolExpr
+      case Token.If        => this.parseIfExpr
       case Token.LeftParen => this.parseGroupExpr
       case _               => this -> Left(ParserError.NotImplemented)
 
@@ -87,11 +90,34 @@ sealed case class Parser private (
         latestParser -> expr.map(Expr.Infix(infixToken, left, _))
       case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("infix token")))
 
-  private def parseBool: ParserState[Expr] = this -> {
+  private def parseBoolExpr: ParserState[Expr] = this -> {
     this.curToken match
       case token: BoolToken => Right(Expr.Bool(token))
       case other            => Left(ParserError.UnexpectedToken(other, Token.Ident("bool token")))
   }
+
+  private def parseIfExpr: ParserState[Expr] =
+    if !this.peekToken.equals(Token.LeftParen) then
+      this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
+    else
+      val (latestParser, eitherCond) = this.next.parseExpr(Precedence.Lowest)
+      val valid = eitherCond.flatMap(expr =>
+        if latestParser.curToken.equals(Token.RightParen) && latestParser.peekToken.equals(Token.LeftBrace)
+        then Right(expr)
+        else if latestParser.curToken.equals(Token.RightParen) then
+          Left(ParserError.UnexpectedToken(latestParser.curToken, Token.RightParen))
+        else Left(ParserError.UnexpectedToken(latestParser.peekToken, Token.LeftBrace))
+      )
+      val finalParser = latestParser.next.next
+
+      val r = for {
+        cond <- valid
+        conseq <- finalParser.parseProgram(Token.RightBrace)
+      } yield Expr.If(cond, conseq, None)
+      finalParser.skipToRightBrace.next -> r
+
+  private def skipToRightBrace: Parser =
+    if this.curToken.equals(Token.RightBrace) then this else this.next.skipToRightBrace
 
   private def parseGroupExpr: ParserState[Expr] =
     val (latestParser, expr) = this.next.parseExpr(Precedence.Lowest)
@@ -116,30 +142,39 @@ object Parser:
   @tailrec
   private def parseProgram(
       parser: Parser,
+      endToken: Token = Token.Eof,
       acc: Either[ParserErrors, Program] = Right(Seq())
   ): Either[ParserErrors, Program] =
-    if parser.curToken.equals(Token.Eof) then acc
+    if parser.curToken.equals(Token.Eof) || parser.curToken.equals(endToken)
+    then acc
     else
       val parsed = parser.parseStatement
       parsed._2 match
-        case Right(stmt) => parseProgram(parsed._1.next, acc.map(_ :+ stmt))
+        case Right(stmt) => parseProgram(parsed._1.next, endToken, acc.map(_ :+ stmt))
         case Left(err) =>
           parseProgram(
             parsed._1.next,
+            endToken,
             Left {
               acc match
-                case Left(seq) => seq :+ err
-                case _         => Seq(err)
+                case Left(seq) => seq.concat(err.lift)
+                case _         => err.lift
             }
           )
+  end parseProgram
 
-private type ParserState[T] = (Parser, Either[ParserError, T])
+private type ParserState[T] = (Parser, Either[ParserError | ParserErrors, T])
 
 private enum ParserError:
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
 
-private type ParserErrors = Seq[ParserError]
+private type ParserErrors = List[ParserError]
+
+extension (item: ParserError | ParserErrors)
+  def lift: ParserErrors = item match
+    case err: ParserError   => List(err)
+    case errs: ParserErrors => errs
 
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
