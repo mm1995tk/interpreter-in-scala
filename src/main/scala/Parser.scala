@@ -58,7 +58,7 @@ sealed case class Parser private (
         case Right(expr) =>
           parser.peekToken match
             case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
-              go(parser.next.parseInfixExpr(expr))
+              go(parser.parseInfixExpr(expr))
             case _ => item
     end go
 
@@ -84,9 +84,9 @@ sealed case class Parser private (
     case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("prefix token")))
 
   private def parseInfixExpr(left: Expr): ParserState[Expr] =
-    this.curToken match
+    this.peekToken match
       case infixToken: InfixToken =>
-        val (latestParser, expr) = this.next.parseExpr(getInfixPrecedence(infixToken))
+        val (latestParser, expr) = this.next.next.parseExpr(getInfixPrecedence(infixToken))
         latestParser -> expr.map(Expr.Infix(infixToken, left, _))
       case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("infix token")))
 
@@ -96,28 +96,30 @@ sealed case class Parser private (
       case other            => Left(ParserError.UnexpectedToken(other, Token.Ident("bool token")))
   }
 
+  private def parseBlockStatement: ParserState[Program] =
+    if !this.peekToken.equals(Token.LeftBrace) then
+      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftBrace))
+    val (parser, eitherStmts) = this.next.next.parseProgram(Token.RightBrace)
+    parser.next -> eitherStmts
+
   private def parseIfExpr: ParserState[Expr] =
     if !this.peekToken.equals(Token.LeftParen) then
       return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
 
     val (parser, notValidatedEitherCond) = this.next.parseExpr(Precedence.Lowest)
     val validatedEitherCond = notValidatedEitherCond.flatMap(expr =>
-      val rBool = parser.curToken.equals(Token.RightParen)
-      if rBool && parser.peekToken.equals(Token.LeftBrace) then Right(expr)
-      else if rBool then Left(ParserError.UnexpectedToken(parser.curToken, Token.RightParen))
+      val isRightParenToken = parser.curToken.equals(Token.RightParen)
+      if isRightParenToken && parser.peekToken.equals(Token.LeftBrace) then Right(expr)
+      else if isRightParenToken then Left(ParserError.UnexpectedToken(parser.curToken, Token.RightParen))
       else Left(ParserError.UnexpectedToken(parser.peekToken, Token.LeftBrace))
     )
 
-    val (parsedByIf, eitherConseq) = parser.next.next.parseProgram(Token.RightBrace)
+    val (parsedByIf, eitherConseq) = parser.parseBlockStatement
 
     val (parsedByElse, eitherAlter): ParserState[Option[Program]] =
-      val isElseToken = (p: Parser) => p.curToken.equals(Token.Else)
-      val next = parsedByIf.next
-      if isElseToken(next) && next.peekToken.equals(Token.LeftBrace) then
-        val (parser, alter) = next.next.next.parseProgram(Token.RightBrace)
+      if parsedByIf.curToken.equals(Token.Else) then
+        val (parser, alter) = parsedByIf.parseBlockStatement
         parser -> alter.map(Some(_))
-      else if isElseToken(parsedByIf) then
-        parsedByIf -> Left(ParserError.UnexpectedToken(parsedByIf.peekToken, Token.LeftBrace))
       else parsedByIf -> Right(None)
 
     parsedByElse -> {
