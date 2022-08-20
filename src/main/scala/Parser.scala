@@ -22,7 +22,7 @@ sealed case class Parser private (
 
   private def parseLetStatement: ParserState[Statement] =
     this.peekToken match
-      case ident @ Token.Ident(str) =>
+      case ident @ Token.Ident(_) =>
         val nextParser = this.next
         if nextParser.peekToken != Token.Assign then
           nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.Assign))
