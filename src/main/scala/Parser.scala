@@ -156,11 +156,10 @@ object Parser:
 
   @tailrec private def parseProgram(
       parser: Parser,
-      endToken: Token = Token.Eof,
+      endToken: Token,
       acc: Either[ParserErrors, Program] = Right(Seq())
   ): ParserState[Program] =
-    if parser.curToken.equals(Token.Eof) || parser.curToken.equals(endToken)
-    then parser -> acc
+    if parser.curToken.equals(endToken) then parser -> acc
     else
       val parsed = parser.parseStatement
       parsed._2 match
