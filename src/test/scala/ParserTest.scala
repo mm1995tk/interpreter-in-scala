@@ -157,6 +157,24 @@ class ParserTest extends munit.FunSuite {
     val stmt = parser.parseProgram()._2.getOrElse(Seq()).head
     assertEquals(stmt.toStr, "if ((5 > 3)) {let k = 2;return (k + 1);} else {let k = 7;return (k + 1);}")
   }
+
+  test("関数リテラルのテスト") {
+    val parser = Parser(Lexer("let k = fn(x, y) {x+y}"))
+    parser.parseProgram()._2 match
+      case Right(v) => assertEquals(v.toStr, "let k = fn(x, y) {(x + y)};")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
+
+  test("改行を含む関数リテラルのテスト") {
+    val parser = Parser(Lexer("let k = fn(x, y) {let v = x*2;\nv+y}"))
+    parser.parseProgram()._2 match
+      case Right(v) => assertEquals(v.toStr, "let k = fn(x, y) {let v = (x * 2);(v + y)};")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
 }
 
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
@@ -233,6 +251,8 @@ given Node[Expr] with
       case Expr.Prefix(ident, r)   => s"(${ident.showLiteral}${r.toStr})"
       case Expr.Infix(ident, l, r) => s"(${l.toStr} ${ident.showLiteral} ${r.toStr})"
       case Expr.Bool(token)        => token.equals(Token.True).toString()
+      case Expr.Fn(params, body) =>
+        s"${Token.Function.showLiteral}(${params.map(_._1.showLiteral).mkString(", ")}) {${body.toStr}}"
       case Expr.If(cond, conseq, alter) =>
         s"if (${cond.toStr}) {${conseq.toStr}} ${alter match
             case Some(v) => s"else {${v.toStr}}"
@@ -259,7 +279,7 @@ extension (token: Token)
     case Token.RightParen           => ")"
     case Token.LeftBrace            => "{"
     case Token.RightBrace           => "}"
-    case Token.Function             => "function"
+    case Token.Function             => "fn"
     case Token.Let                  => "let"
     case Token.True                 => "true"
     case Token.False                => "false"

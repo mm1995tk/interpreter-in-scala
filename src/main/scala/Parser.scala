@@ -46,6 +46,7 @@ sealed case class Parser private (
       case Token.Int(_)    => this.parseIntLiteral
       case Token.If        => this.parseIfExpr
       case Token.LeftParen => this.parseGroupExpr
+      case Token.Function  => this.paraseFnLiteral
       case _: PrefixToken  => this.parsePrefixExpr
       case _: BoolToken    => this.parseBoolExpr
       case _               => this -> Left(ParserError.NotImplemented)
@@ -75,6 +76,42 @@ sealed case class Parser private (
       case ident @ Token.Int(_) => Right(Expr.Int(ident))
       case other                => Left(ParserError.UnexpectedToken(other, Token.Ident("any integer")))
   }
+
+  private def paraseFnLiteral: ParserState[Expr] =
+    if !this.peekToken.equals(Token.LeftParen) then
+      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
+
+    val (parser, params) = this.parseFnParams
+    val (parser2, body) = parser.parseBlockStatement
+    parser2 -> {
+      for {
+        p <- params
+        b <- body
+      } yield Expr.Fn(p, b)
+    }
+
+  private def parseFnParams: ParserState[Seq[Expr.Ident]] =
+    if !this.peekToken.equals(Token.LeftParen) then
+      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
+
+    val n = this.next
+    if n.peekToken.equals(Token.RightParen) then return n -> Right(Seq())
+
+    @tailrec def rec(item: ParserState[Seq[Expr.Ident]]): ParserState[Seq[Expr.Ident]] =
+      if !item._1.peekToken.equals(Token.Comma) then return item
+      val parser = item._1.next.next
+      parser.curToken match
+        case t @ Token.Ident(_) => rec(parser -> item._2.map(_.concat(Seq(Expr.Ident(t)))))
+        case t                  => parser -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
+    end rec
+
+    val nn = n.next
+    nn.curToken match
+      case t @ Token.Ident(_) =>
+        val (p, v) = rec(nn -> Right(Seq(Expr.Ident(t))))
+        p.next -> v
+      case t => nn -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
+  end parseFnParams
 
   private def parsePrefixExpr: ParserState[Expr] = this.curToken match
     case ident: PrefixToken =>

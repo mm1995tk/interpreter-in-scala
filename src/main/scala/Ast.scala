@@ -16,3 +16,4 @@ enum Expr:
   case Infix(token: InfixToken, left: Expr, right: Expr)
   case Bool(token: BoolToken)
   case If(cond: Expr, consequence: Program, alter: Option[Program])
+  case Fn(parms: Seq[Expr.Ident], body: Program)
