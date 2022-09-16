@@ -196,21 +196,21 @@ object Parser:
       endToken: Token,
       acc: Either[ParserErrors, Program] = Right(Seq())
   ): ParserState[Program] =
-    if parser.curToken.equals(endToken) then parser -> acc
-    else
-      val parsed = parser.parseStatement
-      parsed._2 match
-        case Right(stmt) => parseProgram(parsed._1.next, endToken, acc.map(_ :+ stmt))
-        case Left(err) =>
-          parseProgram(
-            parsed._1.next,
-            endToken,
-            Left {
-              acc match
-                case Left(seq) => seq.concat(err.lift)
-                case _         => err.lift
-            }
-          )
+    if parser.curToken.equals(endToken) then return parser -> acc
+
+    val parsed = parser.parseStatement
+    parsed._2 match
+      case Right(stmt) => parseProgram(parsed._1.next, endToken, acc.map(_ :+ stmt))
+      case Left(err) =>
+        parseProgram(
+          parsed._1.next,
+          endToken,
+          Left {
+            acc match
+              case Left(seq) => seq.concat(err.lift)
+              case _         => err.lift
+          }
+        )
   end parseProgram
 
 private type ParserState[T] = (Parser, Either[ParserError | ParserErrors, T])
