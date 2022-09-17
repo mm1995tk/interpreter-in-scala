@@ -253,6 +253,10 @@ extension (item: ParserError | ParserErrors)
     case err: ParserError   => List(err)
     case errs: ParserErrors => errs
 
+def showErr(item: ParserError | ParserErrors): String = item match
+  case err: ParserError   => err.show
+  case errs: ParserErrors => errs.map(_.show).mkString(", ")
+
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
   def >(target: Precedence) = this.ordinal > target.ordinal
@@ -268,3 +272,9 @@ private def getInfixPrecedence(token: InfixToken): Precedence = token match
   case Token.Eq        => Precedence.Equals
   case Token.NotEq     => Precedence.Equals
   case Token.LeftParen => Precedence.Call
+
+extension (p: ParserError)
+  def show: String = p match
+    case ParserError.UnexpectedToken(obtained, expected) =>
+      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
+    case _ => "not impl"

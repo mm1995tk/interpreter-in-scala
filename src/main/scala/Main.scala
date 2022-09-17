@@ -1,7 +1,7 @@
 import scala.sys.process.processInternal
 import lexer.Lexer
 import token.Token
-import parser.Parser
+import parser.{Parser, showErr}
 import ast.given
 
 @main def main: Unit =
@@ -25,7 +25,6 @@ def repl: Unit =
 
   val (next, result) = parser.parseProgram()
   result.map(_.toStr) match
-    case Right(v) =>
-      println(v)
-      repl
-    case _ => repl
+    case Right(v) => println(v)
+    case Left(v)  => println(showErr(v))
+  repl
