@@ -112,8 +112,8 @@ sealed case class Parser private (
     val nn = n.next
     nn.curToken match
       case t @ Token.Ident(_) =>
-        val (p, v) = rec(nn -> Right(Seq(Expr.Ident(t))))
-        p.next -> v
+        val (p, expr) = rec(nn -> Right(Seq(Expr.Ident(t))))
+        p.next -> expr
       case t => nn -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
   end parseFnParams
 
@@ -129,11 +129,11 @@ sealed case class Parser private (
         left match
           case fn: (Expr.Fn | Expr.Ident) =>
             val (p, expr) = this.parseCallArgs
-            p -> expr.map(item => Expr.Call(fn, item))
+            p -> expr.map(Expr.Call(fn, _))
           case _ => this -> Left(ParserError.NotImplemented)
       case infixToken: InfixToken =>
-        val (latestParser, expr) = this.next.next.parseExpr(getInfixPrecedence(infixToken))
-        latestParser -> expr.map(Expr.Infix(infixToken, left, _))
+        val (p, expr) = this.next.next.parseExpr(getInfixPrecedence(infixToken))
+        p -> expr.map(Expr.Infix(infixToken, left, _))
       case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("infix token")))
 
   private def parseCallArgs: ParserState[Seq[Expr]] =
@@ -142,12 +142,11 @@ sealed case class Parser private (
 
     @tailrec def rec(item: ParserState[Seq[Expr]]): ParserState[Seq[Expr]] =
       if !item._1.peekToken.equals(Token.Comma) then return item
-      val parser = item._1.next.next
-      val tmp = parser.parseExpr(Precedence.Lowest)
-      rec(tmp._1 -> {
+      val (parser, expr) = item._1.next.next.parseExpr(Precedence.Lowest)
+      rec(parser -> {
         for {
           a <- item._2
-          b <- tmp._2
+          b <- expr
         } yield a.appended(b)
       })
     end rec

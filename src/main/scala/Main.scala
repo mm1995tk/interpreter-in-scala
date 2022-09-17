@@ -23,8 +23,8 @@ def repl: Unit =
 
   val parser = Parser(Lexer(input))
 
-  val (next, result) = parser.parseProgram()
-  result.map(_.toStr) match
+  parser.parseProgram()._2.map(_.toStr) match
     case Right(v) => println(v)
     case Left(v)  => println(showErr(v))
+
   repl
