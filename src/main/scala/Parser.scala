@@ -47,8 +47,8 @@ sealed case class Parser private (
       case Token.If        => this.parseIfExpr
       case Token.LeftParen => this.parseGroupExpr
       case Token.Function  => this.paraseFnLiteral
-      case _: PrefixToken  => this.parsePrefixExpr
-      case _: BoolToken    => this.parseBoolExpr
+      case t: PrefixToken  => this.parsePrefixExpr(t)
+      case t: BoolToken    => this -> Right(Expr.Bool(t))
       case _               => this -> Left(ParserError.NotImplemented)
 
     @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
@@ -117,11 +117,9 @@ sealed case class Parser private (
       case t => nn -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
   end parseFnParams
 
-  private def parsePrefixExpr: ParserState[Expr] = this.curToken match
-    case ident: PrefixToken =>
-      val (latestParser, expr) = this.next.parseExpr(Precedence.Prefix)
-      latestParser -> expr.map(Expr.Prefix(ident, _))
-    case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("prefix token")))
+  private def parsePrefixExpr(ident: PrefixToken): ParserState[Expr] =
+    val (latestParser, expr) = this.next.parseExpr(Precedence.Prefix)
+    latestParser -> expr.map(Expr.Prefix(ident, _))
 
   private def parseInfixExpr(left: Expr): ParserState[Expr] =
     this.peekToken match
@@ -157,12 +155,6 @@ sealed case class Parser private (
     p.next -> v
 
   end parseCallArgs
-
-  private def parseBoolExpr: ParserState[Expr] = this -> {
-    this.curToken match
-      case token: BoolToken => Right(Expr.Bool(token))
-      case other            => Left(ParserError.UnexpectedToken(other, Token.Ident("bool token")))
-  }
 
   private def parseBlockStatement: ParserState[Program] =
     if !this.peekToken.equals(Token.LeftBrace) then
