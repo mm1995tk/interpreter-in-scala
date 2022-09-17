@@ -141,12 +141,13 @@ sealed case class Parser private (
     @tailrec def rec(item: ParserState[Seq[Expr]]): ParserState[Seq[Expr]] =
       if !item._1.peekToken.equals(Token.Comma) then return item
       val (parser, expr) = item._1.next.next.parseExpr(Precedence.Lowest)
-      rec(parser -> {
-        for {
-          a <- item._2
-          b <- expr
-        } yield a.appended(b)
-      })
+      
+      val result = for {
+        seq <- item._2
+        expr <- expr
+      } yield seq :+ expr
+
+      rec(parser -> result)
     end rec
 
     val nn = n.next
