@@ -1,6 +1,8 @@
 import scala.sys.process.processInternal
 import lexer.Lexer
 import token.Token
+import parser.Parser
+import ast.given
 
 @main def main: Unit =
   println("\nWelcome to Monkey Language!");
@@ -19,14 +21,11 @@ def repl: Unit =
   }
   println("");
 
-  loop(Lexer(input))
-  repl
+  val parser = Parser(Lexer(input))
 
-def loop(lexer: Lexer): Unit =
-  val (next, token) = lexer.getToken
-  if (token == Token.Eof) {
-    println("");
-    return
-  }
-  println(token)
-  loop(next)
+  val (next, result) = parser.parseProgram()
+  result.map(_.toStr) match
+    case Right(v) =>
+      println(v)
+      repl
+    case _ => repl
