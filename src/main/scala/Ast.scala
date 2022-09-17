@@ -17,3 +17,4 @@ enum Expr:
   case Bool(token: BoolToken)
   case If(cond: Expr, consequence: Program, alter: Option[Program])
   case Fn(parms: Seq[Expr.Ident], body: Program)
+  case Call(fn: Expr.Ident | Expr.Fn, args: Seq[Expr])

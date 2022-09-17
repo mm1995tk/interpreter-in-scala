@@ -175,6 +175,26 @@ class ParserTest extends munit.FunSuite {
         println(v)
         assert(false)
   }
+
+  test("関数呼び出しのテスト") {
+    val parser = Parser(Lexer("add(1 +4, 2)"))
+    parser.parseProgram()._2 match
+      case Right(v) => assertEquals(v.toStr, "add((1 + 4), 2)")
+      case Left(v) =>
+        println(v)
+        assert(false)
+
+  }
+
+  test("関数呼び出しのテスト(即時実行)") {
+    val parser = Parser(Lexer("fn(x, y) {x+ y}(1 +4, 2)"))
+    parser.parseProgram()._2 match
+      case Right(v) => assertEquals(v.toStr, "fn(x, y) {(x + y)}((1 + 4), 2)")
+      case Left(v) =>
+        println(v)
+        assert(false)
+
+  }
 }
 
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
@@ -258,6 +278,7 @@ given Node[Expr] with
             case Some(v) => s"else {${v.toStr}}"
             case None    => ""
           }"
+      case Expr.Call(fn, args) => s"${fn.toStr}(${args.map(_.toStr).mkString(", ")})"
 
 extension (token: Token)
   def showLiteral: String = token match

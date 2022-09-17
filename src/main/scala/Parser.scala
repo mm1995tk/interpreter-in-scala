@@ -82,7 +82,11 @@ sealed case class Parser private (
       return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
 
     val (parser, params) = this.parseFnParams
-    val (parser2, body) = parser.parseBlockStatement
+    val (parser2, body) = {
+      if !parser.peekToken.equals(Token.LeftBrace) then
+        return parser -> Left(ParserError.UnexpectedToken(parser.peekToken, Token.LeftBrace))
+      parser.next.next.parseProgram(Token.RightBrace)
+    }
     parser2 -> {
       for {
         p <- params
@@ -121,10 +125,39 @@ sealed case class Parser private (
 
   private def parseInfixExpr(left: Expr): ParserState[Expr] =
     this.peekToken match
+      case leftParen @ Token.LeftParen =>
+        left match
+          case fn: (Expr.Fn | Expr.Ident) =>
+            val (p, expr) = this.parseCallArgs
+            p -> expr.map(item => Expr.Call(fn, item))
+          case _ => this -> Left(ParserError.NotImplemented)
       case infixToken: InfixToken =>
         val (latestParser, expr) = this.next.next.parseExpr(getInfixPrecedence(infixToken))
         latestParser -> expr.map(Expr.Infix(infixToken, left, _))
       case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("infix token")))
+
+  private def parseCallArgs: ParserState[Seq[Expr]] =
+    val n = this.next
+    if n.peekToken.equals(Token.RightParen) then return n -> Right(Seq())
+
+    @tailrec def rec(item: ParserState[Seq[Expr]]): ParserState[Seq[Expr]] =
+      if !item._1.peekToken.equals(Token.Comma) then return item
+      val parser = item._1.next.next
+      val tmp = parser.parseExpr(Precedence.Lowest)
+      rec(tmp._1 -> {
+        for {
+          a <- item._2
+          b <- tmp._2
+        } yield a.appended(b)
+      })
+    end rec
+
+    val nn = n.next
+    val (a, b) = nn.parseExpr(Precedence.Lowest)
+    val (p, v) = rec(a -> b.map(Seq(_)))
+    p.next -> v
+
+  end parseCallArgs
 
   private def parseBoolExpr: ParserState[Expr] = this -> {
     this.curToken match
@@ -167,9 +200,6 @@ sealed case class Parser private (
     }
   end parseIfExpr
 
-  private def skipToRightBrace: Parser =
-    if this.curToken.equals(Token.RightBrace) then this else this.next.skipToRightBrace
-
   private def parseGroupExpr: ParserState[Expr] =
     val (latestParser, expr) = this.next.parseExpr(Precedence.Lowest)
     latestParser.peekToken match
@@ -179,9 +209,6 @@ sealed case class Parser private (
   private def next: Parser =
     val (nextLexer, token) = lexer.getToken
     this.copy(lexer = nextLexer, curToken = this.peekToken, peekToken = token)
-
-  @tailrec private def skipToSemicolon: Parser =
-    if this.curToken == Token.Semicolon then this else this.next.skipToSemicolon
 
 end Parser
 
@@ -232,11 +259,12 @@ private enum Precedence:
   case Lowest, Equals, LessOrGreater, Sum, Product, Prefix, Call
 
 private def getInfixPrecedence(token: InfixToken): Precedence = token match
-  case Token.Plus     => Precedence.Sum
-  case Token.Minus    => Precedence.Sum
-  case Token.Asterisk => Precedence.Product
-  case Token.Slash    => Precedence.Product
-  case Token.Lt       => Precedence.LessOrGreater
-  case Token.Gt       => Precedence.LessOrGreater
-  case Token.Eq       => Precedence.Equals
-  case Token.NotEq    => Precedence.Equals
+  case Token.Plus      => Precedence.Sum
+  case Token.Minus     => Precedence.Sum
+  case Token.Asterisk  => Precedence.Product
+  case Token.Slash     => Precedence.Product
+  case Token.Lt        => Precedence.LessOrGreater
+  case Token.Gt        => Precedence.LessOrGreater
+  case Token.Eq        => Precedence.Equals
+  case Token.NotEq     => Precedence.Equals
+  case Token.LeftParen => Precedence.Call
