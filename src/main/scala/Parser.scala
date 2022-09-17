@@ -42,14 +42,14 @@ sealed case class Parser private (
 
   private def parseExpr(precedence: Precedence): ParserState[Expr] =
     val leftExp: ParserState[Expr] = this.curToken match
-      case Token.Ident(_)  => this.parseIdentifier
-      case Token.Int(_)    => this.parseIntLiteral
-      case Token.If        => this.parseIfExpr
-      case Token.LeftParen => this.parseGroupExpr
-      case Token.Function  => this.paraseFnLiteral
-      case t: PrefixToken  => this.parsePrefixExpr(t)
-      case t: BoolToken    => this -> Right(Expr.Bool(t))
-      case _               => this -> Left(ParserError.NotImplemented)
+      case t @ Token.Ident(_) => this -> Right(Expr.Ident(t))
+      case t @ Token.Int(_)   => this -> Right(Expr.Int(t))
+      case Token.If           => this.parseIfExpr
+      case Token.LeftParen    => this.parseGroupExpr
+      case Token.Function     => this.paraseFnLiteral
+      case t: PrefixToken     => this.parsePrefixExpr(t)
+      case t: BoolToken       => this -> Right(Expr.Bool(t))
+      case _                  => this -> Left(ParserError.NotImplemented)
 
     @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
       val (parser, either) = item
@@ -64,18 +64,6 @@ sealed case class Parser private (
 
     go(leftExp)
   end parseExpr
-
-  private def parseIdentifier: ParserState[Expr] = this -> {
-    this.curToken match
-      case ident @ Token.Ident(_) => Right(Expr.Ident(ident))
-      case other                  => Left(ParserError.UnexpectedToken(other, Token.Ident("any identity")))
-  }
-
-  private def parseIntLiteral: ParserState[Expr] = this -> {
-    this.curToken match
-      case ident @ Token.Int(_) => Right(Expr.Int(ident))
-      case other                => Left(ParserError.UnexpectedToken(other, Token.Ident("any integer")))
-  }
 
   private def paraseFnLiteral: ParserState[Expr] =
     if !this.peekToken.equals(Token.LeftParen) then
@@ -141,7 +129,7 @@ sealed case class Parser private (
     @tailrec def rec(item: ParserState[Seq[Expr]]): ParserState[Seq[Expr]] =
       if !item._1.peekToken.equals(Token.Comma) then return item
       val (parser, expr) = item._1.next.next.parseExpr(Precedence.Lowest)
-      
+
       val result = for {
         seq <- item._2
         expr <- expr
