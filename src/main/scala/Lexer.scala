@@ -20,9 +20,9 @@ def getToken(lexer: Lexer): (Lexer, Token) =
 
     case ch: CodeLiteral => n -> ch.convertCharOfCodeToToken
 
-    case ch if ch.isDigit => readNumber(advanceCursor(lexer))
+    case ch if ch.isDigit => readNumber(lexer)
 
-    case ch if ch.isLetter => readIdentifier(advanceCursor(lexer))
+    case ch if ch.isLetter => readIdentifier(lexer)
     case 0                 => n -> Token.Eof
     case _                 => n -> Token.Illegal
 
@@ -38,26 +38,32 @@ private def advanceCursor(lexer: Lexer) = lexer.copy(cursor = lexer.cursor + 1)
   if !getChar(lexer).isWhitespace then lexer
   else skipWhitespace(advanceCursor(lexer))
 
-@tailrec private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
-  if !getChar(lexer).isDigit then
-    skipWhitespace(lexer) -> Token.Int {
-      lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor).toInt
-    }
-  else readNumber(advanceCursor(lexer), relativePos + 1)
+private def readNumber(lexer: Lexer): (Lexer, Token.Int) =
+  // あとで不動点コンビネータで書き換える
+  @tailrec def go(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
+    if !getChar(lexer).isDigit then
+      skipWhitespace(lexer) -> Token.Int {
+        lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor).toInt
+      }
+    else go(advanceCursor(lexer), relativePos + 1)
+  go(advanceCursor(lexer))
 
-@tailrec private def readIdentifier(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
-  if !getChar(lexer).isLetter then
-    skipWhitespace(lexer) -> (lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor) match
-      case "let"    => Token.Let
-      case "return" => Token.Return
-      case "if"     => Token.If
-      case "else"   => Token.Else
-      case "true"   => Token.True
-      case "false"  => Token.False
-      case "fn"     => Token.Function
-      case others   => Token.Ident(others)
-    )
-  else readIdentifier(advanceCursor(lexer), relativePos + 1)
+private def readIdentifier(lexer: Lexer): (Lexer, Token) =
+  // あとで不動点コンビネータで書き換える
+  @tailrec def go(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
+    if !getChar(lexer).isLetter then
+      skipWhitespace(lexer) -> (lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor) match
+        case "let"    => Token.Let
+        case "return" => Token.Return
+        case "if"     => Token.If
+        case "else"   => Token.Else
+        case "true"   => Token.True
+        case "false"  => Token.False
+        case "fn"     => Token.Function
+        case others   => Token.Ident(others)
+      )
+    else go(advanceCursor(lexer), relativePos + 1)
+  go(advanceCursor(lexer))
 
 private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | ',' | ';'
 extension (item: CodeLiteral)
