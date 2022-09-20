@@ -3,64 +3,61 @@ package lexer
 import token.Token
 import scala.annotation.tailrec
 
-class Lexer private (input: String, cursor: Int):
-  def getToken: (Lexer, Token) =
-    val next = this.next
-    this.getChar match
-      case '=' =>
-        if next.getChar == '=' then next.next -> Token.Eq
-        else next -> Token.Assign
-
-      case '!' =>
-        if next.getChar == '=' then next.next -> Token.NotEq
-        else next -> Token.Bang
-
-      case ch: CodeLiteral => next -> ch.convertCharOfCodeToToken
-
-      case ch if ch.isDigit => this.readNumber(this.advanceCursor)
-
-      case ch if ch.isLetter => this.readIdentifier(this.advanceCursor)
-      case 0                 => next -> Token.Eof
-      case _                 => next -> Token.Illegal
-
-  private def next = this.advanceCursor.skipWhitespace
-
-  @tailrec
-  private def skipWhitespace: Lexer =
-    if this.getChar.isWhitespace then this.advanceCursor.skipWhitespace
-    else this
-
-  private def getChar =
-    if this.cursor > this.input.length - 1 then 0.toChar
-    else this.input.charAt(this.cursor)
-
-  private def advanceCursor = new Lexer(this.input, this.cursor + 1)
-
-  @tailrec
-  private def readIdentifier(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
-    if !lexer.getChar.isLetter then
-      lexer.skipWhitespace -> (input.substring(this.cursor, this.cursor + 1 + relativePos) match
-        case "let"    => Token.Let
-        case "return" => Token.Return
-        case "if"     => Token.If
-        case "else"   => Token.Else
-        case "true"   => Token.True
-        case "false"  => Token.False
-        case "fn"     => Token.Function
-        case others   => Token.Ident(others)
-      )
-    else this.readIdentifier(lexer.advanceCursor, relativePos + 1)
-
-  @tailrec
-  private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
-    if !lexer.getChar.isDigit then
-      lexer.skipWhitespace -> Token.Int {
-        input.substring(this.cursor, this.cursor + 1 + relativePos).toInt
-      }
-    else this.readNumber(lexer.advanceCursor, relativePos + 1)
-
+case class Lexer(input: String, cursor: Int)
 object Lexer:
-  def apply(input: String): Lexer = new Lexer(input, 0).skipWhitespace
+  def apply(input: String): Lexer = skipWhitespace(Lexer(input, 0))
+
+def getToken(lexer: Lexer): (Lexer, Token) =
+  val n = next(lexer)
+  getChar(lexer) match
+    case '=' =>
+      if getChar(n) == '=' then next(n) -> Token.Eq
+      else n -> Token.Assign
+
+    case '!' =>
+      if getChar(n) == '=' then next(n) -> Token.NotEq
+      else n -> Token.Bang
+
+    case ch: CodeLiteral => n -> ch.convertCharOfCodeToToken
+
+    case ch if ch.isDigit => readNumber(advanceCursor(lexer))
+
+    case ch if ch.isLetter => readIdentifier(advanceCursor(lexer))
+    case 0                 => n -> Token.Eof
+    case _                 => n -> Token.Illegal
+
+private def next = skipWhitespace compose advanceCursor
+
+private def getChar(lexer: Lexer) =
+  if lexer.cursor > lexer.input.length - 1 then 0.toChar
+  else lexer.input.charAt(lexer.cursor)
+
+private def advanceCursor(lexer: Lexer) = lexer.copy(cursor = lexer.cursor + 1)
+
+@tailrec private def skipWhitespace(lexer: Lexer): Lexer =
+  if !getChar(lexer).isWhitespace then lexer
+  else skipWhitespace(advanceCursor(lexer))
+
+@tailrec private def readNumber(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
+  if !getChar(lexer).isDigit then
+    skipWhitespace(lexer) -> Token.Int {
+      lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor).toInt
+    }
+  else readNumber(advanceCursor(lexer), relativePos + 1)
+
+@tailrec private def readIdentifier(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
+  if !getChar(lexer).isLetter then
+    skipWhitespace(lexer) -> (lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor) match
+      case "let"    => Token.Let
+      case "return" => Token.Return
+      case "if"     => Token.If
+      case "else"   => Token.Else
+      case "true"   => Token.True
+      case "false"  => Token.False
+      case "fn"     => Token.Function
+      case others   => Token.Ident(others)
+    )
+  else readIdentifier(advanceCursor(lexer), relativePos + 1)
 
 private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | ',' | ';'
 extension (item: CodeLiteral)

@@ -187,15 +187,15 @@ sealed case class Parser private (
       case other            => this -> Left(ParserError.UnexpectedToken(other, Token.RightParen))
 
   private def next: Parser =
-    val (nextLexer, token) = lexer.getToken
+    val (nextLexer, token) = getToken(lexer)
     this.copy(lexer = nextLexer, curToken = this.peekToken, peekToken = token)
 
 end Parser
 
 object Parser:
   def apply(lexer: Lexer) =
-    val (secondLexer, curToken) = lexer.getToken
-    val (thirdLexer, peekToken) = secondLexer.getToken
+    val (secondLexer, curToken) = getToken(lexer)
+    val (thirdLexer, peekToken) = getToken(secondLexer)
     new Parser(thirdLexer, curToken, peekToken)
 
   @tailrec private def parseProgram(
