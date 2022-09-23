@@ -24,13 +24,11 @@ def repl: Unit =
 
   val parser = Parser(Lexer(input))
 
-  parser.parseProgram()._2.map(evaluator.Evaluator.apply) match
-    case Right(Some(obj)) => println(obj.show)
-    case Left(v)        => println(showErr(v))
-    case _              => "todo!"
+  evaluator.Evaluator(parser.parseProgram()._2) match
+    case Right(obj) => println(obj.show)
+    case Left(v)    => println(showErr(v))
 
   repl
-
 
 extension (obj: Object)
   def show = obj match
