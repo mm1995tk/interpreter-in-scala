@@ -222,11 +222,11 @@ object Parser:
 
 private type ParserState[T] = (Parser, Either[ParserError | ParserErrors, T])
 
-private enum ParserError:
+enum ParserError:
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
 
-private type ParserErrors = List[ParserError]
+type ParserErrors = List[ParserError]
 
 extension (item: ParserError | ParserErrors)
   def lift: ParserErrors = item match
