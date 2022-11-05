@@ -23,6 +23,7 @@ private def evalExpr(expr: Expr): Object = expr match
   case Expr.Bool(t)           => Object.Boolean(t.equals(Token.True))
   case expr: Expr.Prefix      => evalPrefixExpr(expr)
   case expr: Expr.Infix       => evalInfixExpr(expr)
+  case expr: Expr.If          => evalIfExpr(expr)
   case _                      => ???
 
 private def evalPrefixExpr(item: Expr.Prefix) =
@@ -88,5 +89,18 @@ private def evalInfixExpr(item: Expr.Infix): Object =
       result getOrElse ConstNull
 
     case Token.LeftParen => ???
+
+private def evalIfExpr(item: Expr.If): Object =
+
+  val consequence = () => Evaluator(Right(item.consequence)).getOrElse(ConstNull)
+  val alter = () =>
+    item.alter match
+      case Some(alter) => Evaluator(Right(alter)).getOrElse(ConstNull)
+      case None        => (ConstNull)
+
+  evalExpr(item.cond) match
+    case Object.Boolean(bool) => if bool then consequence() else alter()
+    case Object.Int(value)    => consequence()
+    case Object.Null          => alter()
 
 private val ConstNull = obj.Object.Null
