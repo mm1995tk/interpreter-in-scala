@@ -29,7 +29,7 @@ private def evalExpr(expr: Expr): Object = expr match
 private def evalPrefixExpr(item: Expr.Prefix) =
   val Expr.Prefix(t, expr) = item
   lazy val right = evalExpr(expr)
-  
+
   t match
     case Token.Minus =>
       right match
@@ -54,10 +54,11 @@ private def evalInfixExpr(item: Expr.Infix): Object =
             case Token.Asterisk => l * r
           Object.Int(result)
         case (Object.Boolean(l), Object.Boolean(r)) =>
-          val result = t match
-            case Token.Plus     => l || r
-            case Token.Asterisk => l && r
-          Object.Boolean(l || r)
+          Object.Boolean {
+            t match
+              case Token.Plus     => l || r
+              case Token.Asterisk => l && r
+          }
         case _ => ConstNull
 
     case t: (Token.Minus.type | Token.Slash.type) =>
