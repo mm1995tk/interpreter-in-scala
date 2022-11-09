@@ -4,7 +4,7 @@ import token.Token
 import parser.{Parser, showErr, ParserError, ParserErrors}
 import ast.given
 import obj.Object
-import evaluator.Evaluator
+import evaluator.evalProgram
 import obj.EvalError
 
 @main def main: Unit =
@@ -24,14 +24,7 @@ def repl: Unit =
   }
   println("");
 
-  val parser = Parser(Lexer(input))
-
-  val result = for {
-    r <- parser.parseProgram()._2
-    rr <- evaluator.Evaluator(r)
-  } yield rr
-
-  parser.parseProgram()._2.flatMap(Evaluator(_)) match
+  Parser(Lexer(input)).parseProgram()._2.flatMap(evalProgram(_)) match
     case Right(obj) => println(obj.show)
     case Left(err) =>
       err match

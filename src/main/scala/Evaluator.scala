@@ -9,19 +9,18 @@ import parser.{ParserError, ParserErrors}
 import java.util.Objects
 import cats.Bifunctor
 
-object Evaluator:
-  def apply(program: Program): Either[EvalError, Object] =
-    program.headOption match
-      case Some(h) =>
-        program.tail.foldLeft(eval(h)) { (acc, cur) =>
-          acc match
-            case err @ Left(_)                     => err
-            case rv @ Right(Object.ReturnValue(_)) => rv
-            case _                                 => eval(cur)
-        }
-      case None => Right(ConstNull)
+def evalProgram(program: Program): Either[EvalError, Object] =
+  program.headOption match
+    case None => Right(ConstNull)
+    case Some(h) =>
+      program.tail.foldLeft(evalStatement(h)) { (acc, cur) =>
+        acc match
+          case err @ Left(_)                     => err
+          case rv @ Right(Object.ReturnValue(_)) => rv
+          case _                                 => evalStatement(cur)
+      }
 
-private def eval(stmt: Statement): Either[EvalError, Object] = stmt match
+private def evalStatement(stmt: Statement): Either[EvalError, Object] = stmt match
   case Statement.Expr(expr) => evalExpr(expr)
   case Statement.Return(expr) =>
     evalExpr(expr).map(_.get match
@@ -108,10 +107,10 @@ private def evalInfixExpr(item: Expr.Infix): Either[EvalError, Object] = for {
   case Token.LeftParen => ???
 
 private def evalIfExpr(item: Expr.If): Either[EvalError, Object] =
-  lazy val consequence = Evaluator(item.consequence)
+  lazy val consequence = evalProgram(item.consequence)
   lazy val alter =
     item.alter match
-      case Some(alter) => Evaluator(alter)
+      case Some(alter) => evalProgram(alter)
       case None        => Right(ConstNull)
 
   evalExpr(item.cond).flatMap {
