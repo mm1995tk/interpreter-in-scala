@@ -12,9 +12,16 @@ object Evaluator:
   def apply(
       programOrErr: Either[ParserError | ParserErrors, Program]
   ): Either[ParserError | ParserErrors, Object] =
-    val r = programOrErr.map { _.reverse.headOption.map(eval).getOrElse(ConstNull) }
-    println(r)
-    r
+    programOrErr.map { program =>
+      program.headOption match
+        case Some(h) =>
+          program.tail.foldLeft(eval(h)) { (acc, cur) =>
+            acc match
+              case obj @ Object.ReturnValue(_) => obj
+              case _                           => eval(cur)
+          }
+        case None => ConstNull
+    }
 
 private def eval(stmt: Statement): Object = stmt match
   case Statement.Expr(expr) => evalExpr(expr)
