@@ -6,8 +6,6 @@ import obj.*
 import ast.{Statement, Expr}
 import token.Token
 import parser.{ParserError, ParserErrors}
-import java.util.Objects
-import cats.Bifunctor
 
 def evalProgram(program: Program): Either[EvalError, Object] =
   program.headOption match
