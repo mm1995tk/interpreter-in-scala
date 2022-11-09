@@ -34,4 +34,5 @@ extension (obj: Object)
   def show = obj match
     case Object.Int(value)     => value
     case Object.Boolean(value) => value
+    case Object.ReturnValue(value) => value
     case Object.Null           => "null"

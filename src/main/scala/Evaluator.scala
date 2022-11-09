@@ -12,11 +12,18 @@ object Evaluator:
   def apply(
       programOrErr: Either[ParserError | ParserErrors, Program]
   ): Either[ParserError | ParserErrors, Object] =
-    programOrErr.map { _.reverse.headOption.map(eval).getOrElse(ConstNull) }
+    val r = programOrErr.map { _.reverse.headOption.map(eval).getOrElse(ConstNull) }
+    println(r)
+    r
 
 private def eval(stmt: Statement): Object = stmt match
   case Statement.Expr(expr) => evalExpr(expr)
-  case _                    => ???
+  case Statement.Return(expr) =>
+    evalExpr(expr).get match
+      case Some(v) => Object.ReturnValue(v)
+      case _       => ConstNull
+
+  case _ => ???
 
 private def evalExpr(expr: Expr): Object = expr match
   case Expr.Int(Token.Int(v)) => Object.Int(v)
@@ -101,8 +108,9 @@ private def evalIfExpr(item: Expr.If): Object =
       case None        => ConstNull
 
   evalExpr(item.cond) match
-    case Object.Boolean(bool) => if bool then consequence else alter
-    case Object.Int(value)    => consequence
-    case Object.Null          => alter
+    case Object.Boolean(bool)      => if bool then consequence else alter
+    case Object.Int(value)         => consequence
+    case Object.ReturnValue(value) => ???
+    case Object.Null               => alter
 
 private val ConstNull = obj.Object.Null
