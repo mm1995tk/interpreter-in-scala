@@ -38,9 +38,8 @@ private def evalExpr(expr: Expr): Either[EvalError, Object] = expr match
 
 private def evalPrefixExpr(item: Expr.Prefix): Either[EvalError, Object] =
   val Expr.Prefix(t, expr) = item
-  lazy val r = evalExpr(expr)
 
-  r.map { right =>
+  evalExpr(expr).map { right =>
     t match
       case Token.Minus =>
         right match
