@@ -1,9 +1,11 @@
 import scala.sys.process.processInternal
 import lexer.Lexer
 import token.Token
-import parser.{Parser, showErr}
+import parser.{Parser, showErr, ParserError, ParserErrors}
 import ast.given
 import obj.Object
+import evaluator.Evaluator
+import obj.EvalError
 
 @main def main: Unit =
   println("\nWelcome to Monkey Language!");
@@ -24,15 +26,23 @@ def repl: Unit =
 
   val parser = Parser(Lexer(input))
 
-  evaluator.Evaluator(parser.parseProgram()._2) match
+  val result = for {
+    r <- parser.parseProgram()._2
+    rr <- evaluator.Evaluator(r)
+  } yield rr
+
+  parser.parseProgram()._2.flatMap(Evaluator(_)) match
     case Right(obj) => println(obj.show)
-    case Left(v)    => println(showErr(v))
+    case Left(err) =>
+      err match
+        case t: EvalError => ???
+        case _            => showErr(_)
 
   repl
 
 extension (obj: Object)
   def show = obj match
-    case Object.Int(value)     => value
-    case Object.Boolean(value) => value
+    case Object.Int(value)         => value
+    case Object.Boolean(value)     => value
     case Object.ReturnValue(value) => value
-    case Object.Null           => "null"
+    case Object.Null               => "null"
