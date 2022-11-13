@@ -4,6 +4,26 @@ import ast.*
 import lexer.*
 import token.*
 import scala.annotation.tailrec
+import cats.data.State
+import org.atnos.eff.all._
+import org.atnos.eff.syntax.all._
+import org.atnos.eff._
+import cats.data.{StateT, State}
+
+// TODO: モナドトランスフォーマーを使って書き換え
+// type EitherParserErrorOr[T] = Either[ParserError, T]
+// type ParserM = StateT[EitherParserErrorOr, String, Program]
+
+// def f: ParserM = ???
+// def g: ParserM = for {
+//   ff <- f
+//   g <- StateT.get[EitherParserErrorOr, String]
+//   j <- StateT.fromState[EitherParserErrorOr, String, Token](lexer.tokenize.map(Right(_)))
+//   s <- StateT.lift[EitherParserErrorOr, String, Int](Right(3))
+// } yield Seq()
+
+// def h =
+//   g.runA("aaaasss")
 
 sealed case class Parser private (
     private val input: String,
