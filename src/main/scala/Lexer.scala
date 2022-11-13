@@ -2,68 +2,78 @@ package lexer
 
 import token.Token
 import scala.annotation.tailrec
+import cats.data.State
 
-case class Lexer(input: String, cursor: Int)
-object Lexer:
-  def apply(input: String): Lexer = skipWhitespace(Lexer(input, 0))
+type Lexer = State[String, Token]
 
-def getToken(lexer: Lexer): (Lexer, Token) =
-  val n = next(lexer)
-  getChar(lexer) match
+def tokenize: Lexer = next.flatMap {
+  case char @ '='            => twoCharLexer(char)
+  case char @ '!'            => twoCharLexer(char)
+  case char: CodeLiteral     => State.pure(char.convertCharOfCodeToToken)
+  case char if char.isDigit  => numberLexer(char.toString())
+  case char if char.isLetter => identifierLexer(char.toString())
+  case 0                     => State.pure(Token.Eof)
+  case _                     => State.pure(Token.Illegal)
+}
+
+private def twoCharLexer(char0: Char): Lexer = for {
+  state0 <- State.get[String]
+  char1 <- next
+  state1 <- State.get[String]
+  token <- char0 match
     case '=' =>
-      if getChar(n) == '=' then next(n) -> Token.Eq
-      else n -> Token.Assign
+      if char1 == '=' then State.pure(Token.Eq)
+      else State.set(state0).map(_ => Token.Assign)
 
     case '!' =>
-      if getChar(n) == '=' then next(n) -> Token.NotEq
-      else n -> Token.Bang
+      if char1 == '=' then State.pure(Token.NotEq)
+      else State.set(state0).map(_ => Token.Bang)
+} yield token
 
-    case ch: CodeLiteral => n -> ch.convertCharOfCodeToToken
+private def numberLexer(n: String): Lexer = for {
+  state0 <- State.get[String]
+  char1 <- getChar
+  token <-
+    if char1.isDigit then numberLexer(s"${n}${char1}")
+    else State.set(state0).map(_ => Token.Int(n.toInt))
 
-    case ch if ch.isDigit => readNumber(lexer)
+} yield token
 
-    case ch if ch.isLetter => readIdentifier(lexer)
-    case 0                 => n -> Token.Eof
-    case _                 => n -> Token.Illegal
+private def identifierLexer(str: String): Lexer = for {
+  state0 <- State.get[String]
+  char0 <- getChar
+  token <-
+    if char0.isLetter then identifierLexer(s"${str}${char0}")
+    else
+      State
+        .set(state0)
+        .map(_ =>
+          str match
+            case "let"    => Token.Let
+            case "return" => Token.Return
+            case "if"     => Token.If
+            case "else"   => Token.Else
+            case "true"   => Token.True
+            case "false"  => Token.False
+            case "fn"     => Token.Function
+            case others   => Token.Ident(others)
+        )
+} yield token
 
-private def next = skipWhitespace compose advanceCursor
+private def getChar: State[String, Char] = for {
+  str <- State.get[String]
+  (state, char) = if str.isEmpty() then (str, 0.toChar) else (str.substring(1), str.charAt(0))
+  _ <- State.set(state)
+} yield char
 
-private def getChar(lexer: Lexer) =
-  if lexer.cursor > lexer.input.length - 1 then 0.toChar
-  else lexer.input.charAt(lexer.cursor)
+private def skipWhitespace(char0: Char): State[String, Char] = for {
+  str <- State.get[String]
+  r <-
+    if !char0.isWhitespace then State.pure(char0)
+    else next
+} yield r
 
-private def advanceCursor(lexer: Lexer) = lexer.copy(cursor = lexer.cursor + 1)
-
-@tailrec private def skipWhitespace(lexer: Lexer): Lexer =
-  if !getChar(lexer).isWhitespace then lexer
-  else skipWhitespace(advanceCursor(lexer))
-
-private def readNumber(lexer: Lexer): (Lexer, Token.Int) =
-  // あとで不動点コンビネータで書き換える
-  @tailrec def go(lexer: Lexer, relativePos: Int = 0): (Lexer, Token.Int) =
-    if !getChar(lexer).isDigit then
-      skipWhitespace(lexer) -> Token.Int {
-        lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor).toInt
-      }
-    else go(advanceCursor(lexer), relativePos + 1)
-  go(advanceCursor(lexer))
-
-private def readIdentifier(lexer: Lexer): (Lexer, Token) =
-  // あとで不動点コンビネータで書き換える
-  @tailrec def go(lexer: Lexer, relativePos: Int = 0): (Lexer, Token) =
-    if !getChar(lexer).isLetter then
-      skipWhitespace(lexer) -> (lexer.input.substring(lexer.cursor - relativePos - 1, lexer.cursor) match
-        case "let"    => Token.Let
-        case "return" => Token.Return
-        case "if"     => Token.If
-        case "else"   => Token.Else
-        case "true"   => Token.True
-        case "false"  => Token.False
-        case "fn"     => Token.Function
-        case others   => Token.Ident(others)
-      )
-    else go(advanceCursor(lexer), relativePos + 1)
-  go(advanceCursor(lexer))
+private def next: State[String, Char] = getChar.flatMap(skipWhitespace)
 
 private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | ',' | ';'
 extension (item: CodeLiteral)

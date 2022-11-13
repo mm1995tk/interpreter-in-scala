@@ -6,7 +6,7 @@ import token.*
 import scala.annotation.tailrec
 
 sealed case class Parser private (
-    private val lexer: Lexer,
+    private val input: String,
     private val curToken: Token,
     private val peekToken: Token
 ):
@@ -187,16 +187,19 @@ sealed case class Parser private (
       case other            => this -> Left(ParserError.UnexpectedToken(other, Token.RightParen))
 
   private def next: Parser =
-    val (nextLexer, token) = getToken(lexer)
-    this.copy(lexer = nextLexer, curToken = this.peekToken, peekToken = token)
+    val (state, nextToken) = lexer.tokenize.run(this.input).value
+    this.copy(input = state, curToken = this.peekToken, peekToken = nextToken)
 
 end Parser
 
 object Parser:
-  def apply(lexer: Lexer) =
-    val (secondLexer, curToken) = getToken(lexer)
-    val (thirdLexer, peekToken) = getToken(secondLexer)
-    new Parser(thirdLexer, curToken, peekToken)
+  def apply(input: String) =
+    val (state, (cur, peek)) = (for {
+      a <- lexer.tokenize
+      b <- lexer.tokenize
+    } yield (a, b)).run(input).value
+
+    new Parser(state, cur, peek)
 
   @tailrec private def parseProgram(
       parser: Parser,

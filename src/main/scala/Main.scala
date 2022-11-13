@@ -24,7 +24,7 @@ def repl: Unit =
   }
   println("");
 
-  Parser(Lexer(input)).parseProgram()._2.flatMap(evalProgram(_)) match
+  Parser(input).parseProgram()._2.flatMap(evalProgram(_)) match
     case Right(obj) => println(obj.show)
     case Left(err) =>
       err match
