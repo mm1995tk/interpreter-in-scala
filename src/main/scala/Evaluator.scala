@@ -37,20 +37,19 @@ private def evalExpr(expr: Expr): Either[EvalError, Object] = expr match
   case _                      => ???
 
 private def evalPrefixExpr(item: Expr.Prefix): Either[EvalError, Object] =
-  val Expr.Prefix(t, expr) = item
+  val Expr.Prefix(t: token.PrefixToken, expr) = item
 
-  evalExpr(expr).map { right =>
-    t match
-      case Token.Minus =>
-        right match
-          case Object.Int(v) => Object.Int(-v)
-          case _             => ConstNull
-      case Token.Bang =>
-        right match
-          case Object.Int(v)     => Object.Boolean(false)
-          case Object.Boolean(b) => Object.Boolean(!b)
-          case _                 => Object.Boolean(true)
-      case _ => ???
+  evalExpr(expr).map {
+    case Object.Int(v) =>
+      t match
+        case Token.Minus => Object.Int(-v)
+        case Token.Bang  => Object.Boolean(false)
+    case Object.Boolean(b) =>
+      t match
+        case Token.Minus => ConstNull
+        case Token.Bang  => Object.Boolean(!b)
+    case Object.Null => Object.Boolean(true)
+    case _           => ConstNull
   }
 
 private def evalInfixExpr(item: Expr.Infix): Either[EvalError, Object] = for {
