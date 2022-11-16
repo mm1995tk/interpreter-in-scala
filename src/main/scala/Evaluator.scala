@@ -5,7 +5,8 @@ import lexer.*
 import obj.*
 import ast.{Statement, Expr}
 import token.{Token, InfixToken}
-import parser.{ParserError, ParserErrors}
+import parser.{ParserError}
+import token.showLiteral
 
 def evalProgram(program: Program): Either[EvalError, Object] =
   program.headOption match
@@ -70,7 +71,7 @@ private def evalInfixExpr(item: Expr.Infix): Either[EvalError, Object] = for {
             case Token.Plus     => l || r
             case Token.Asterisk => l && r
         }
-      case _ => ConstNull
+      case (l, r) => return Left(EvalError.TypeMismatch(l, r, t))
 
   case t: (Token.Minus.type | Token.Slash.type) =>
     (expOfL, expOfR) match
@@ -79,7 +80,7 @@ private def evalInfixExpr(item: Expr.Infix): Either[EvalError, Object] = for {
           case Token.Minus => l - r
           case Token.Slash => l / r
         Object.Int(result)
-      case _ => ConstNull
+      case (l, r) => return Left(EvalError.TypeMismatch(l, r, t))
 
   case t: (Token.Lt.type | Token.Gt.type) =>
     (expOfL, expOfR) match
@@ -89,7 +90,7 @@ private def evalInfixExpr(item: Expr.Infix): Either[EvalError, Object] = for {
             case Token.Lt => l < r
             case Token.Gt => l > r
         }
-      case _ => ConstNull
+      case (l, r) => return Left(EvalError.TypeMismatch(l, r, t))
 
   case t: (Token.Eq.type | Token.NotEq.type) =>
     val result = for {
@@ -120,4 +121,8 @@ private def evalIfExpr(item: Expr.If): Either[EvalError, Object] =
 private val ConstNull = Object.Null
 
 enum EvalError:
+  def show: String = this match
+    case TypeMismatch(l, r, op) =>
+      s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
+
   case TypeMismatch(left: Object, right: Object, op: InfixToken)

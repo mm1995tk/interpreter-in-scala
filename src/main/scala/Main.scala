@@ -1,7 +1,7 @@
 import scala.sys.process.processInternal
 import lexer.Lexer
 import token.Token
-import parser.{Parser, showErr, ParserError, ParserErrors}
+import parser.{Parser, ParserError}
 import ast.given
 import obj.Object
 import evaluator.{evalProgram, EvalError}
@@ -26,9 +26,11 @@ def repl: Unit =
   Parser(Lexer(input)).parseProgram()._2.flatMap(evalProgram(_)) match
     case Right(obj) => println(obj.show)
     case Left(err) =>
-      err match
-        case t: EvalError => ???
-        case _            => showErr(_)
+      println {
+        err match
+          case t: EvalError   => t.show
+          case e: ParserError => e.show
+      }
 
   repl
 
