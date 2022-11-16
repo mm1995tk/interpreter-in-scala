@@ -4,7 +4,7 @@ import ast.*
 import lexer.*
 import obj.*
 import ast.{Statement, Expr}
-import token.Token
+import token.{Token, InfixToken}
 import parser.{ParserError, ParserErrors}
 
 def evalProgram(program: Program): Either[EvalError, Object] =
@@ -34,6 +34,7 @@ private def evalExpr(expr: Expr): Either[EvalError, Object] = expr match
   case expr: Expr.Prefix      => evalPrefixExpr(expr)
   case expr: Expr.Infix       => evalInfixExpr(expr)
   case expr: Expr.If          => evalIfExpr(expr)
+  case Expr.Null              => Right(ConstNull)
   case _                      => ???
 
 private def evalPrefixExpr(item: Expr.Prefix): Either[EvalError, Object] =
@@ -116,4 +117,7 @@ private def evalIfExpr(item: Expr.If): Either[EvalError, Object] =
     case Object.Null               => alter
   }
 
-private val ConstNull = obj.Object.Null
+private val ConstNull = Object.Null
+
+enum EvalError:
+  case TypeMismatch(left: Object, right: Object, op: InfixToken)

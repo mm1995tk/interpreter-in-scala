@@ -10,6 +10,7 @@ enum Statement:
   case Expr(expr: ast.Expr)
 
 enum Expr:
+  case Null
   case Ident(token: Token.Ident)
   case Int(token: Token.Int)
   case Prefix(token: PrefixToken, right: Expr)
@@ -35,6 +36,7 @@ given Node[Statement] with
 given Node[Expr] with
   extension (e: Expr)
     def toStr: String = e match
+      case Expr.Null               => "null"
       case Expr.Ident(ident)       => ident.showLiteral
       case Expr.Int(ident)         => ident.showLiteral
       case Expr.Prefix(ident, r)   => s"(${ident.showLiteral}${r.toStr})"

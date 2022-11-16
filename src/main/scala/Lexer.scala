@@ -60,6 +60,7 @@ private def readIdentifier(lexer: Lexer): (Lexer, Token) =
         case "true"   => Token.True
         case "false"  => Token.False
         case "fn"     => Token.Function
+        case "null"   => Token.Null
         case others   => Token.Ident(others)
       )
     else go(advanceCursor(lexer), relativePos + 1)

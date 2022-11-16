@@ -15,6 +15,3 @@ enum Object:
   case Null
 
 type MonkeyPrimitiveType = scala.Int | scala.Boolean
-
-enum EvalError:
-  case TypeMismatch(left: Object, right: Object, op: InfixToken)

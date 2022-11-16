@@ -4,8 +4,7 @@ import token.Token
 import parser.{Parser, showErr, ParserError, ParserErrors}
 import ast.given
 import obj.Object
-import evaluator.evalProgram
-import obj.EvalError
+import evaluator.{evalProgram, EvalError}
 
 @main def main: Unit =
   println("\nWelcome to Monkey Language!");
@@ -15,7 +14,7 @@ import obj.EvalError
 def repl: Unit =
   print(">> ")
   val input = scala.io.StdIn.readLine()
-  if (input == ":exit") {
+  if (input == ":q") {
     println("");
     println("thanks for using!");
     println("");

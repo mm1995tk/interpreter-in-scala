@@ -42,6 +42,7 @@ sealed case class Parser private (
 
   private def parseExpr(precedence: Precedence): ParserState[Expr] =
     val leftExp: ParserState[Expr] = this.curToken match
+      case Token.Null         => this -> Right(Expr.Null)
       case t @ Token.Ident(_) => this -> Right(Expr.Ident(t))
       case t @ Token.Int(_)   => this -> Right(Expr.Int(t))
       case Token.If           => this.parseIfExpr
