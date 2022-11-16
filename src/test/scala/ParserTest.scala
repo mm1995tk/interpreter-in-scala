@@ -27,20 +27,10 @@ class ParserTest extends munit.FunSuite {
 
     stmts match
       case Right(_) => assert(false)
-      case Left(seq) =>
+      case Left(err) =>
         assertEquals(
-          seq.lift.filterNot(_.equals(ParserError.NotImplemented)),
-          List(
-            ParserError.UnexpectedToken(Token.Int(5), Token.Assign),
-            ParserError.UnexpectedToken(
-              Token.Assign,
-              Token.Ident("variable names")
-            ),
-            ParserError.UnexpectedToken(
-              Token.Int(838383),
-              Token.Ident("variable names")
-            )
-          )
+          err,
+          ParserError.UnexpectedToken(Token.Int(5), Token.Assign)
         )
 
   }
