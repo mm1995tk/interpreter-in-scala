@@ -4,7 +4,7 @@ import ast.*
 import lexer.*
 import obj.*
 import ast.{Statement, Expr}
-import token.{Token, InfixToken}
+import token.{Token, InfixToken, PrefixToken}
 import parser.{ParserError}
 import token.showLiteral
 
@@ -39,7 +39,7 @@ private def evalExpr(expr: Expr): Either[EvalError, Object] = expr match
   case _                      => ???
 
 private def evalPrefixExpr(item: Expr.Prefix): Either[EvalError, Object] =
-  val Expr.Prefix(t: token.PrefixToken, expr) = item
+  val Expr.Prefix(t: PrefixToken, expr) = item
 
   evalExpr(expr).map {
     case Object.Int(v) =>
