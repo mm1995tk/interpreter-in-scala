@@ -3,6 +3,10 @@ package obj
 import token.{InfixToken}
 
 enum Object:
+  def unwrap: MonkeyPrimitiveType = this match
+    case Object.ReturnValue(obj: MonkeyPrimitiveType) => obj
+    case obj: MonkeyPrimitiveType                     => obj
+
   case Int(value: scala.Int)
   case Boolean(value: scala.Boolean)
   case ReturnValue(value: MonkeyPrimitiveType)

@@ -6,6 +6,7 @@ import ast.given
 import obj.Object
 import evaluator.{evalProgram, EvalError}
 import env.Env
+import obj.getValue
 
 @main def main: Unit =
   println("\nWelcome to Monkey Language!");
@@ -35,8 +36,8 @@ def repl(env: Env): Env =
           case Left(err)  => err.show
       }
     case Left(e) => env -> e.show
-  
-    println(v)
+
+  println(v)
 
   repl(e)
 
@@ -44,5 +45,5 @@ extension (obj: Object)
   def show = obj match
     case Object.Int(value)         => value
     case Object.Boolean(value)     => value
-    case Object.ReturnValue(value) => value
+    case Object.ReturnValue(value) => value.getValue.getOrElse("null")
     case Object.Null               => "null"
