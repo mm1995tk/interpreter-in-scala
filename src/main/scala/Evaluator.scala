@@ -8,6 +8,7 @@ import token.{Token, InfixToken, PrefixToken}
 import parser.{ParserError}
 import token.showLiteral
 import env.Env
+import cats.implicits._
 
 def evalProgram(program: Program, env: Env): (Env, Either[EvalError, Object]) =
   program.headOption match
@@ -47,6 +48,7 @@ private def evalExpr(expr: Expr, env: Env): (Env, Either[EvalError, Object]) = e
   case expr: Expr.Infix       => evalInfixExpr(expr, env)
   case expr: Expr.If          => evalIfExpr(expr, env)
   case Expr.Null              => env -> Right(ConstNull)
+  case Expr.Call(fn, args)    => env -> evalCallExpr(fn, args, env)
   case Expr.Ident(t @ Token.Ident(key)) =>
     env -> {
       env.get(key) match
@@ -54,8 +56,45 @@ private def evalExpr(expr: Expr, env: Env): (Env, Either[EvalError, Object]) = e
         case Some(Object.ReturnValue(obj))  => Right(obj)
         case None                           => Left(EvalError.UncaughtReferenceError(t))
     }
+  case Expr.Fn(params, body) =>
+    env -> Right { Object.Function(params.map(_.token), body, Env().concat(env)) }
 
-  case _ => ???
+private def evalCallExpr(
+    fn: Expr.Ident | Expr.Fn,
+    args: Seq[Expr],
+    env: Env
+): Either[EvalError, Object] = for {
+  fnObj <- {
+    fn match
+      case Expr.Fn(params, body) =>
+        // val env = params
+        Right { Object.Function(params.map(_.token), body, Env().concat(env)) }
+      case Expr.Ident(t @ Token.Ident(key)) =>
+        env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
+          case obj @ Object.Function(_, _, _) => Right(obj)
+          case _                              => Left(???) // 関数以外のエラー
+        }
+  }: Either[EvalError, Object.Function]
+
+  evaluatedArgs <- {
+    if fnObj.params.length.equals(args.length) then
+      val t: Either[EvalError, Seq[MonkeyPrimitiveType]] = {
+        args
+          .map(evalExpr(_, env)._2.flatMap {
+            case Object.ReturnValue(_)      => Left(???)
+            case other: MonkeyPrimitiveType => Right(other)
+          }): Seq[Either[EvalError, MonkeyPrimitiveType]]
+      }.sequence
+
+      t.map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1)))
+    else Left(EvalError.CountOfArgsMismatch(args.length, fnObj.params.length))
+  }
+  maybeHead = evaluatedArgs.headOption.map { item => env.updated(item._1, item._2): Env }
+  localEnv = evaluatedArgs.tail.foldLeft(maybeHead.getOrElse(env)) { (acc, cur) =>
+    acc.updated(cur._1, cur._2)
+  }
+  result <- evalProgram(fnObj.program, localEnv)._2
+} yield result
 
 private def evalPrefixExpr(item: Expr.Prefix, env: Env): (Env, Either[EvalError, MonkeyPrimitiveType]) =
   val Expr.Prefix(t: PrefixToken, expr) = item
@@ -71,7 +110,9 @@ private def evalPrefixExpr(item: Expr.Prefix, env: Env): (Env, Either[EvalError,
       t match
         case Token.Minus => ConstNull
         case Token.Bang  => Object.Boolean(!b)
-    case Object.Null               => Object.Boolean(true)
+    case Object.Null => Object.Boolean(true)
+    case obj @ Object.Function(_, _, _) =>
+      return e -> Left(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType))
     case Object.ReturnValue(value) => value
   }
 
@@ -166,6 +207,7 @@ private def evalIfExpr(item: Expr.If, env: Env): (Env, Either[EvalError, Object]
           case Object.Int(value)         => consequence
           case Object.ReturnValue(value) => Right(value)
           case Object.Null               => alter
+          case Object.Function(_, _, _)  => consequence
       }
 
 private val ConstNull: MonkeyPrimitiveType = Object.Null
@@ -175,6 +217,9 @@ enum EvalError:
     case TypeMismatch(l, r, op) =>
       s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
     case UncaughtReferenceError(Token.Ident(key)) => s"uncaught referenceError: $key is not defined"
-
+    case UnknownOperator(op, value)               => s"unknown operator: ${op.showLiteral}${value.getType}"
+    case CountOfArgsMismatch(obtained, expected) => s"expected count of args is $expected, but got $obtained"
   case TypeMismatch(left: MonkeyPrimitiveType, right: MonkeyPrimitiveType, op: InfixToken)
   case UncaughtReferenceError(ident: Token.Ident)
+  case UnknownOperator(op: PrefixToken, value: MonkeyPrimitiveType)
+  case CountOfArgsMismatch(obtained: Int, expected: Int)

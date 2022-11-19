@@ -46,4 +46,5 @@ extension (obj: Object)
     case Object.Int(value)         => value
     case Object.Boolean(value)     => value
     case Object.ReturnValue(value) => value.getValue.getOrElse("null")
+    case Object.Function(_, _, _)  => "function"
     case Object.Null               => "null"
