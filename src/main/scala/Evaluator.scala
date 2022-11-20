@@ -57,7 +57,7 @@ private def evalExpr(expr: Expr, env: Env): (Env, Either[EvalError, Object]) = e
         case None                           => Left(EvalError.UncaughtReferenceError(t))
     }
   case Expr.Fn(params, body) =>
-    env -> Right { Object.Function(params.map(_.token), body, Env().concat(env)) }
+    env -> Right { Object.Function(params.map(_.token), body, env) }
 
 private def evalCallExpr(
     fn: Expr.Ident | Expr.Fn,
@@ -68,7 +68,7 @@ private def evalCallExpr(
     fn match
       case Expr.Fn(params, body) =>
         // val env = params
-        Right { Object.Function(params.map(_.token), body, Env().concat(env)) }
+        Right { Object.Function(params.map(_.token), body, env) }
       case Expr.Ident(t @ Token.Ident(key)) =>
         env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
           case obj @ Object.Function(_, _, _) => Right(obj)
@@ -89,11 +89,11 @@ private def evalCallExpr(
       t.map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1)))
     else Left(EvalError.CountOfArgsMismatch(args.length, fnObj.params.length))
   }
-  maybeHead = evaluatedArgs.headOption.map { item => env.updated(item._1, item._2): Env }
-  localEnv = evaluatedArgs.tail.foldLeft(maybeHead.getOrElse(env)) { (acc, cur) =>
+
+  localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
     acc.updated(cur._1, cur._2)
   }
-  result <- evalProgram(fnObj.program, localEnv)._2
+  result <- evalProgram(fnObj.program, env.concat(localEnv))._2
 } yield result
 
 private def evalPrefixExpr(item: Expr.Prefix, env: Env): (Env, Either[EvalError, MonkeyPrimitiveType]) =
@@ -190,12 +190,11 @@ private def evalCompareOpInfixExpr(
 
 private def evalIfExpr(item: Expr.If, env: Env): (Env, Either[EvalError, Object]) =
   val (e, v) = evalExpr(item.cond, env)
-  val localEnv: Env = Env().concat(e)
 
-  lazy val (_, consequence) = evalProgram(item.consequence, localEnv)
+  lazy val (_, consequence) = evalProgram(item.consequence, e)
   lazy val (_, alter) =
     item.alter match
-      case Some(alter) => evalProgram(alter, localEnv)
+      case Some(alter) => evalProgram(alter, e)
       case None        => e -> Right(ConstNull)
 
   v match

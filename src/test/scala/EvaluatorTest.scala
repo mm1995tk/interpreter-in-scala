@@ -20,6 +20,49 @@ class EvaluatorTest extends munit.FunSuite {
   //     case _        => assert(false)
   // }
 
+  test("関数の評価") {
+    val input = "let plus = fn (a,b) {return a + b;}; plus(1,2)"
+    val (_, parsed) = Parser(Lexer(input)).parseProgram()
+    val env = Env()
+    parsed match
+      case Left(e) =>
+        println(e)
+        assert(false)
+      case Right(value) =>
+        val (_, result) = evalProgram(value, env)
+        result.map(_.unwrap) match
+          case Right(Object.Int(v)) =>
+            assertEquals(v, 3)
+          case Left(e) =>
+            // println(e)
+            assert(false)
+          case _ =>
+            assert(false)
+
+  }
+
+  test("高階関数の評価") {
+
+    val input = "let a = 2; let b = 3;let newAdder = fn(x) {fn(y) {x+y}};let addT = newAdder(a);addT(b)"
+    val (_, parsed) = Parser(Lexer(input)).parseProgram()
+    val env = Env()
+    parsed match
+      case Left(e) =>
+        println(e)
+        assert(false)
+      case Right(value) =>
+        val (_, result) = evalProgram(value, env)
+        result match
+          case Right(Object.Int(v)) =>
+            assertEquals(v, 5)
+          case Left(e) =>
+            // println(e)
+            assert(false)
+          case _ =>
+            assert(false)
+
+  }
+
   test("let文の評価") {
     val list: List[(String, scala.Int)] = List(
       ("let a = 5; a;", 5),
