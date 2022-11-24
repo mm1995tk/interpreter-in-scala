@@ -56,6 +56,7 @@ private def identifierLexer(str: String): Lexer = for {
             case "true"   => Token.True
             case "false"  => Token.False
             case "fn"     => Token.Function
+            case "null"   => Token.Null
             case others   => Token.Ident(others)
         )
 } yield token

@@ -62,6 +62,7 @@ sealed case class Parser private (
 
   private def parseExpr(precedence: Precedence): ParserState[Expr] =
     val leftExp: ParserState[Expr] = this.curToken match
+      case Token.Null         => this -> Right(Expr.Null)
       case t @ Token.Ident(_) => this -> Right(Expr.Ident(t))
       case t @ Token.Int(_)   => this -> Right(Expr.Int(t))
       case Token.If           => this.parseIfExpr
@@ -224,41 +225,26 @@ object Parser:
   @tailrec private def parseProgram(
       parser: Parser,
       endToken: Token,
-      acc: Either[ParserErrors, Program] = Right(Seq())
+      acc: Either[ParserError, Program] = Right(Seq())
   ): ParserState[Program] =
     if parser.curToken.equals(endToken) then return parser -> acc
 
     val parsed = parser.parseStatement
     parsed._2 match
       case Right(stmt) => parseProgram(parsed._1.next, endToken, acc.map(_ :+ stmt))
-      case Left(err) =>
-        parseProgram(
-          parsed._1.next,
-          endToken,
-          Left {
-            acc match
-              case Left(seq) => seq.concat(err.lift)
-              case _         => err.lift
-          }
-        )
+      case Left(e)     => parsed._1 -> Left(e)
   end parseProgram
 
-private type ParserState[T] = (Parser, Either[ParserError | ParserErrors, T])
+private type ParserState[T] = (Parser, Either[ParserError, T])
 
 enum ParserError:
+  def show: String = this match
+    case NotImplemented => "not impl"
+    case UnexpectedToken(obtained, expected) =>
+      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
+
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
-
-type ParserErrors = List[ParserError]
-
-extension (item: ParserError | ParserErrors)
-  def lift: ParserErrors = item match
-    case err: ParserError   => List(err)
-    case errs: ParserErrors => errs
-
-def showErr(item: ParserError | ParserErrors): String = item match
-  case err: ParserError   => err.show
-  case errs: ParserErrors => errs.map(_.show).mkString(", ")
 
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
@@ -275,9 +261,3 @@ private def getInfixPrecedence(token: InfixToken): Precedence = token match
   case Token.Eq        => Precedence.Equals
   case Token.NotEq     => Precedence.Equals
   case Token.LeftParen => Precedence.Call
-
-extension (p: ParserError)
-  def show: String = p match
-    case ParserError.UnexpectedToken(obtained, expected) =>
-      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
-    case _ => "not impl"

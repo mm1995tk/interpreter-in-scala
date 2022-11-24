@@ -25,7 +25,8 @@ enum Token:
     False,
     If,
     Else,
-    Return
+    Return,
+    Null
   case Ident(value: String)
   case Int(value: scala.Int)
 
@@ -39,6 +40,7 @@ type BoolToken = Token.True.type | Token.False.type
 
 extension (token: Token)
   def showLiteral: String = token match
+    case Token.Null                 => "null"
     case Token.Illegal              => 0.toChar.toString()
     case Token.Eof                  => 0.toChar.toString()
     case Token.Assign               => "="
