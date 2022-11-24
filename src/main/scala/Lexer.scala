@@ -66,12 +66,8 @@ private def getChar: State[String, Char] = for {
   _ <- State.set(state)
 } yield char
 
-private def skipWhitespace(char0: Char): State[String, Char] = for {
-  str <- State.get[String]
-  r <-
-    if !char0.isWhitespace then State.pure(char0)
-    else next
-} yield r
+private def skipWhitespace(char0: Char): State[String, Char] =
+  State.get.flatMap(_ => if !char0.isWhitespace then State.pure(char0) else next)
 
 private def next: State[String, Char] = getChar.flatMap(skipWhitespace)
 
