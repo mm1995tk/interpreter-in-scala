@@ -10,11 +10,10 @@ import org.atnos.eff.syntax.all._
 import org.atnos.eff._
 import cats.data.{StateT, State}
 
-
 type EitherParserErrorOr[T] = Either[ParserError, T]
 type Parser = StateT[EitherParserErrorOr, String, Program]
 
-def parseProgram(input: String): Parser = ???
+def parseProgram: Parser = ???
 
 // def f: ParserM = ???
 // def g: ParserM = for {
@@ -26,8 +25,6 @@ def parseProgram(input: String): Parser = ???
 
 // def h =
 //   g.runA("aaaasss")
-
-
 
 enum ParserError:
   def show: String = this match
