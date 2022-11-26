@@ -19,7 +19,6 @@ def tokenize: Lexer = next.flatMap {
 private def twoCharLexer(char0: Char): Lexer = for {
   state0 <- State.get[String]
   char1 <- next
-  state1 <- State.get[String]
   token <- char0 match
     case '=' =>
       if char1 == '=' then State.pure(Token.Eq)
@@ -36,7 +35,6 @@ private def numberLexer(n: String): Lexer = for {
   token <-
     if char1.isDigit then numberLexer(s"${n}${char1}")
     else State.set(state0).map(_ => Token.Int(n.toInt))
-
 } yield token
 
 private def identifierLexer(str: String): Lexer = for {
@@ -63,8 +61,8 @@ private def identifierLexer(str: String): Lexer = for {
 
 private def getChar: State[String, Char] = for {
   str <- State.get[String]
-  (state, char) = if str.isEmpty() then (str, 0.toChar) else (str.substring(1), str.charAt(0))
-  _ <- State.set(state)
+  char <-
+    if str.isEmpty() then State.pure(0.toChar) else State.set(str.substring(1)).map(_ => str.charAt(0))
 } yield char
 
 private def skipWhitespace(char0: Char): State[String, Char] =
