@@ -9,6 +9,7 @@ import org.atnos.eff.all._
 import org.atnos.eff.syntax.all._
 import org.atnos.eff._
 import cats.data.{StateT, State}
+import cats.Show
 
 type EitherParserErrorOr[T] = Either[ParserError, T]
 type Parser = StateT[EitherParserErrorOr, String, Program]
@@ -34,6 +35,12 @@ enum ParserError:
 
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
+
+given Show[ParserError] with
+  def show(t: ParserError): String = t match
+    case ParserError.NotImplemented => "not impl"
+    case ParserError.UnexpectedToken(obtained, expected) =>
+      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
 
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
