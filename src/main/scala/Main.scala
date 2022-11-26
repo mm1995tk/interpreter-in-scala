@@ -29,12 +29,10 @@ def repl(env: Env): Env =
 
   val (e, v) = Parser(input).parseProgram()._2 match
     case Right(v) =>
-      val (e1, v1) = evalProgram(v, env)
-      e1 -> {
-        v1 match
-          case Right(obj) => obj.show
-          case Left(err)  => err.show
-      }
+      evalProgram(v).run(env) match
+        case Left(err)         => (env, err.show)
+        case Right((env, obj)) => (env, obj.show)
+
     case Left(e) => env -> e.show
 
   println(v)

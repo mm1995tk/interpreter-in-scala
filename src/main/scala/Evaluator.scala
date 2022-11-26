@@ -9,99 +9,105 @@ import parser.{ParserError}
 import token.showLiteral
 import env.Env
 import cats.implicits._
+import cats.data.StateT
 
-def evalProgram(program: Program, env: Env): (Env, Either[EvalError, Object]) =
+type EitherEvalErrorOr[T] = Either[EvalError, T]
+
+type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
+
+def evalProgram(program: Program): Evaluator[Object] =
   program.headOption match
-    case None => env -> Right(ConstNull)
+    case None => StateT.lift(Right { ConstNull })
     case Some(h) =>
-      program.tail.foldLeft(evalStatement(h, env)) { (acc, cur) =>
-        acc._2 match
-          case err @ Left(_)                  => acc._1 -> err
-          case Right(Object.ReturnValue(obj)) => acc._1 -> Right(obj)
-          case _                              => evalStatement(cur, acc._1)
+      program.tail.foldLeft(evalStatement(h)) { (acc, cur) =>
+        for {
+          obj <- acc
+          result <- obj match
+            case Object.ReturnValue(obj) => Utils.liftEvaluator[Object](Right(obj))
+            case _                       => evalStatement(cur)
+        } yield result
       }
 
-private def evalStatement(stmt: Statement, env: Env): (Env, Either[EvalError, Object]) = stmt match
-  case Statement.Expr(expr) => evalExpr(expr, env)
+private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
+  case Statement.Expr(expr) => evalExpr(expr)
   case Statement.Return(expr) =>
-    val (e, v) = evalExpr(expr, env)
-
-    e -> v.map {
-      case obj @ Object.ReturnValue(_) => obj
+    evalExpr(expr).map {
       case obj: MonkeyPrimitiveType    => Object.ReturnValue(obj)
+      case obj @ Object.ReturnValue(_) => obj
     }
 
   case Statement.Let(ident, expr) =>
-    val (e: Env, v) = evalExpr(expr, env)
-    v match
-      case err @ Left(_) => e -> err
-      case rightObj @ Right(obj: MonkeyPrimitiveType) =>
-        { e.updated(ident.value, obj): Env } -> rightObj
+    for {
+      monkeyPrimitiveType: MonkeyPrimitiveType <- evalExpr(expr).map(_.unwrap)
+      env <- Utils.getEnv
+      _ <- Utils.setEnv(env.updated(ident.value, monkeyPrimitiveType))
+    } yield monkeyPrimitiveType
 
-      case rightObj @ Right(Object.ReturnValue(obj)) =>
-        { e.updated(ident.value, obj): Env } -> rightObj
-
-private def evalExpr(expr: Expr, env: Env): (Env, Either[EvalError, Object]) = expr match
-  case Expr.Int(Token.Int(v)) => env -> Right(Object.Int(v))
-  case Expr.Bool(t)           => env -> Right(Object.Boolean(t.equals(Token.True)))
-  case expr: Expr.Prefix      => evalPrefixExpr(expr, env)
-  case expr: Expr.Infix       => evalInfixExpr(expr, env)
-  case expr: Expr.If          => evalIfExpr(expr, env)
-  case Expr.Null              => env -> Right(ConstNull)
-  case Expr.Call(fn, args)    => env -> evalCallExpr(fn, args, env)
+private def evalExpr(expr: Expr): Evaluator[Object] = expr match
+  case Expr.Int(Token.Int(v)) => Utils.liftEvaluator[Object](Right(Object.Int(v)))
+  case Expr.Bool(t) =>
+    Utils.liftEvaluator[Object](Right(Object.Boolean(t.equals(Token.True))))
+  case expr: Expr.Prefix =>
+    evalPrefixExpr(expr).map((item: Object) => item)
+  case expr: Expr.Infix    => evalInfixExpr(expr).map((item: Object) => item)
+  case expr: Expr.If       => evalIfExpr(expr).map((item: Object) => item)
+  case Expr.Null           => Utils.liftEvaluator[Object](Right(ConstNull))
+  case Expr.Call(fn, args) => evalCallExpr(fn, args)
   case Expr.Ident(t @ Token.Ident(key)) =>
-    env -> {
-      env.get(key) match
-        case Some(obj: MonkeyPrimitiveType) => Right(obj)
-        case Some(Object.ReturnValue(obj))  => Right(obj)
-        case None                           => Left(EvalError.UncaughtReferenceError(t))
-    }
+    for {
+      eitherObjOrErr <- Utils.getEnv.map {
+        _.get(key) match
+          case Some(obj: MonkeyPrimitiveType) => Right(obj)
+          case Some(Object.ReturnValue(obj))  => Right(obj)
+          case None                           => Left(EvalError.UncaughtReferenceError(t))
+      }
+      obj <- StateT.lift(eitherObjOrErr)
+    } yield obj
+
   case Expr.Fn(params, body) =>
-    env -> Right { Object.Function(params.map(_.token), body, env) }
+    Utils.getEnv.map { Object.Function(params.map(_.token), body, _) }
 
 private def evalCallExpr(
     fn: Expr.Ident | Expr.Fn,
-    args: Seq[Expr],
-    env: Env
-): Either[EvalError, Object] = for {
+    args: Seq[Expr]
+): Evaluator[Object] = for {
+  env <- Utils.getEnv
   fnObj <- {
     fn match
-      case Expr.Fn(params, body) =>
-        // val env = params
-        Right { Object.Function(params.map(_.token), body, env) }
+      case Expr.Fn(params, body) => StateT.lift(Right { Object.Function(params.map(_.token), body, env) })
+
       case Expr.Ident(t @ Token.Ident(key)) =>
-        env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
-          case obj @ Object.Function(_, _, _) => Right(obj)
-          case _                              => Left(???) // 関数以外のエラー
+        StateT.lift {
+          env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
+            case obj: Object.Function => Right(obj)
+            case _                    => Left(???) // 関数以外のエラー
+          }
         }
-  }: Either[EvalError, Object.Function]
+  }: Evaluator[Object.Function]
 
-  evaluatedArgs <- {
+  evaluatedArgs: Seq[(String, MonkeyPrimitiveType)] <-
     if fnObj.params.length.equals(args.length) then
-      val t: Either[EvalError, Seq[MonkeyPrimitiveType]] = {
-        args
-          .map(evalExpr(_, env)._2.flatMap {
-            case Object.ReturnValue(_)      => Left(???)
-            case other: MonkeyPrimitiveType => Right(other)
-          }): Seq[Either[EvalError, MonkeyPrimitiveType]]
-      }.sequence
-
-      t.map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1)))
-    else Left(EvalError.CountOfArgsMismatch(args.length, fnObj.params.length))
-  }
+      args
+        .map(evalExpr(_).map(_.unwrap))
+        .sequence
+        .map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1.unwrap)))
+    else
+      Utils.liftEvaluator[Seq[(String, MonkeyPrimitiveType)]] {
+        Left(EvalError.CountOfArgsMismatch(args.length, fnObj.params.length))
+      }
 
   localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
     acc.updated(cur._1, cur._2)
   }
-  result <- evalProgram(fnObj.program, env.concat(localEnv))._2
+  _ <- Utils.setEnv(env.concat(localEnv))
+  result <- evalProgram(fnObj.program)
+  _ <- Utils.setEnv(env)
 } yield result
 
-private def evalPrefixExpr(item: Expr.Prefix, env: Env): (Env, Either[EvalError, MonkeyPrimitiveType]) =
+private def evalPrefixExpr(item: Expr.Prefix): Evaluator[MonkeyPrimitiveType] =
   val Expr.Prefix(t: PrefixToken, expr) = item
 
-  val (e, v) = evalExpr(expr, env)
-
-  e -> v.map {
+  evalExpr(expr).map {
     case Object.Int(v) =>
       t match
         case Token.Minus => Object.Int(-v)
@@ -111,40 +117,35 @@ private def evalPrefixExpr(item: Expr.Prefix, env: Env): (Env, Either[EvalError,
         case Token.Minus => ConstNull
         case Token.Bang  => Object.Boolean(!b)
     case Object.Null => Object.Boolean(true)
-    case obj @ Object.Function(_, _, _) =>
-      return e -> Left(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType))
+    case obj: Object.Function =>
+      return StateT.lift(Left(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType)))
     case Object.ReturnValue(value) => value
   }
 
-private def evalInfixExpr(item: Expr.Infix, env: Env): (Env, Either[EvalError, MonkeyPrimitiveType]) =
-  val (e1, l) = evalExpr(item.left, env)
-  val (e2, r) = evalExpr(item.right, e1)
+private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = for {
+  expOfL: MonkeyPrimitiveType <- evalExpr(item.left).map(_.unwrap)
+  expOfR: MonkeyPrimitiveType <- evalExpr(item.right).map(_.unwrap)
+  result <- (item.token match
+    case Token.LeftParen => ???
+    case t: (Token.Eq.type | Token.NotEq.type) =>
+      StateT.lift(Right(Object.Boolean {
+        t match
+          case Token.Eq    => expOfL == expOfR
+          case Token.NotEq => expOfL != expOfR
+      }))
 
-  val obj: Either[EvalError, MonkeyPrimitiveType] = for {
-    expOfL <- l.map(_.unwrap): Either[EvalError, MonkeyPrimitiveType];
-    expOfR <- r.map(_.unwrap): Either[EvalError, MonkeyPrimitiveType]
-    result <- (item.token match
-      case Token.LeftParen => ???
-      case t: (Token.Eq.type | Token.NotEq.type) =>
-        Right(Object.Boolean {
-          t match
-            case Token.Eq    => expOfL == expOfR
-            case Token.NotEq => expOfL != expOfR
-        })
-      case t: (Token.Plus.type | Token.Asterisk.type) => evalPlusOrMulOpInfixExpr(t, expOfL, expOfR)
-      case t: (Token.Minus.type | Token.Slash.type)   => evalMinusOrModOpInfixExpr(t, expOfL, expOfR)
-      case t: (Token.Lt.type | Token.Gt.type)         => evalCompareOpInfixExpr(t, expOfL, expOfR)
-    ): Either[EvalError, MonkeyPrimitiveType]
-  } yield result
-
-  e2 -> obj
+    case t: (Token.Plus.type | Token.Asterisk.type) => evalPlusOrMulOpInfixExpr(t, expOfL, expOfR)
+    case t: (Token.Minus.type | Token.Slash.type)   => evalMinusOrModOpInfixExpr(t, expOfL, expOfR)
+    case t: (Token.Lt.type | Token.Gt.type)         => evalCompareOpInfixExpr(t, expOfL, expOfR)
+  ): Evaluator[MonkeyPrimitiveType]
+} yield result
 
 private def evalPlusOrMulOpInfixExpr(
     t: (Token.Plus.type | Token.Asterisk.type),
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
-): Either[EvalError, MonkeyPrimitiveType] =
-  (a, b) match
+): Evaluator[MonkeyPrimitiveType] =
+  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Int {
         t match
@@ -160,12 +161,14 @@ private def evalPlusOrMulOpInfixExpr(
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
 
+  StateT.lift(either)
+
 private def evalMinusOrModOpInfixExpr(
     t: (Token.Minus.type | Token.Slash.type),
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
-): Either[EvalError, MonkeyPrimitiveType] =
-  (a, b) match
+): Evaluator[MonkeyPrimitiveType] =
+  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Int {
         t match
@@ -173,13 +176,14 @@ private def evalMinusOrModOpInfixExpr(
           case Token.Slash => l / r
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
+  StateT.lift(either)
 
 private def evalCompareOpInfixExpr(
     t: (Token.Lt.type | Token.Gt.type),
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
-): Either[EvalError, MonkeyPrimitiveType] =
-  (a, b) match
+): Evaluator[MonkeyPrimitiveType] =
+  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Boolean {
         t match
@@ -187,29 +191,30 @@ private def evalCompareOpInfixExpr(
           case Token.Gt => l > r
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
+  StateT.lift(either)
 
-private def evalIfExpr(item: Expr.If, env: Env): (Env, Either[EvalError, Object]) =
-  val (e, v) = evalExpr(item.cond, env)
+private def evalIfExpr(item: Expr.If): Evaluator[Object] =
 
-  lazy val (_, consequence) = evalProgram(item.consequence, e)
-  lazy val (_, alter) =
+  lazy val consequence: Evaluator[Object] = evalProgram(item.consequence)
+  lazy val alter: Evaluator[Object] =
     item.alter match
-      case Some(alter) => evalProgram(alter, e)
-      case None        => e -> Right(ConstNull)
+      case Some(alter) => evalProgram(alter)
+      case None        => Utils.liftEvaluator[Object](Right(ConstNull))
 
-  v match
-    case err @ Left(_) => e -> err
-    case Right(obj) =>
-      e -> {
-        obj match
-          case Object.Boolean(bool)      => if bool then consequence else alter
-          case Object.Int(value)         => consequence
-          case Object.ReturnValue(value) => Right(value)
-          case Object.Null               => alter
-          case Object.Function(_, _, _)  => consequence
-      }
+  evalExpr(item.cond).flatMap {
+    case Object.Boolean(bool)      => if bool then consequence else alter
+    case Object.ReturnValue(value) => StateT.lift(Right(value))
+    case Object.Null               => alter
+    case Object.Int(value)         => consequence
+    case _: Object.Function        => consequence
+  }
 
 private val ConstNull: MonkeyPrimitiveType = Object.Null
+
+private object Utils:
+  def liftEvaluator[T] = StateT.lift[EitherEvalErrorOr, Env, T]
+  def getEnv = StateT.get[EitherEvalErrorOr, Env]
+  def setEnv = StateT.set[EitherEvalErrorOr, Env]
 
 enum EvalError:
   def show: String = this match
@@ -217,7 +222,8 @@ enum EvalError:
       s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
     case UncaughtReferenceError(Token.Ident(key)) => s"uncaught referenceError: $key is not defined"
     case UnknownOperator(op, value)               => s"unknown operator: ${op.showLiteral}${value.getType}"
-    case CountOfArgsMismatch(obtained, expected) => s"expected count of args is $expected, but got $obtained"
+    case CountOfArgsMismatch(obtained, expected) =>
+      s"expected count of args is $expected, but got $obtained"
   case TypeMismatch(left: MonkeyPrimitiveType, right: MonkeyPrimitiveType, op: InfixToken)
   case UncaughtReferenceError(ident: Token.Ident)
   case UnknownOperator(op: PrefixToken, value: MonkeyPrimitiveType)

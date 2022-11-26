@@ -29,8 +29,7 @@ class EvaluatorTest extends munit.FunSuite {
         println(e)
         assert(false)
       case Right(value) =>
-        val (_, result) = evalProgram(value, env)
-        result.map(_.unwrap) match
+        evalProgram(value).runA(env).map(_.unwrap) match
           case Right(Object.Int(v)) =>
             assertEquals(v, 3)
           case Left(e) =>
@@ -51,8 +50,7 @@ class EvaluatorTest extends munit.FunSuite {
         println(e)
         assert(false)
       case Right(value) =>
-        val (_, result) = evalProgram(value, env)
-        result match
+        evalProgram(value).runA(env) match
           case Right(Object.Int(v)) =>
             assertEquals(v, 5)
           case Left(e) =>
@@ -81,8 +79,7 @@ class EvaluatorTest extends munit.FunSuite {
           println(e)
           assert(false)
         case Right(value) =>
-          val (_, result) = evalProgram(value, env)
-          result match
+          evalProgram(value).runA(env) match
             case Right(v) =>
               v match
                 case Object.ReturnValue(v)  => assertEquals(v.getValue, Some(expected))
