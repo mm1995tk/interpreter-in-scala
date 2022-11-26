@@ -1,7 +1,7 @@
 import scala.sys.process.processInternal
 import lexer.Lexer
 import token.Token
-import parser.{Parser, ParserError}
+import parser.{Parser, ParserError, parseProgram}
 import ast.given
 import obj.Object
 import evaluator.{evalProgram, EvalError}
@@ -27,17 +27,7 @@ def repl(env: Env): Env =
   }
   println("");
 
-  val (e, v) = Parser(input).parseProgram()._2 match
-    case Right(v) =>
-      evalProgram(v).run(env) match
-        case Left(err)         => (env, err.show)
-        case Right((env, obj)) => (env, obj.show)
-
-    case Left(e) => env -> e.show
-
-  println(v)
-
-  repl(e)
+  repl(env)
 
 extension (obj: Object)
   def show = obj match
