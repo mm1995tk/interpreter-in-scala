@@ -172,23 +172,23 @@ class ParserTest extends munit.FunSuite {
 
   }
 
-  // test("関数リテラルのテスト") {
-  //   val parser = Parser(("let k = fn(x, y) {x+y}"))
-  //   parser.parseProgram()._2 match
-  //     case Right(v) => assertEquals(v.toStr, "let k = fn(x, y) {(x + y)};")
-  //     case Left(v) =>
-  //       println(v)
-  //       assert(false)
-  // }
+  test("関数リテラルのテスト") {
+    val parsed = parseProgram.runA("let k = fn(x, y) {x+y};")
+    parsed match
+      case Right(v) => assertEquals(v.show, "let k = fn(x, y) {(x + y)};")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
 
-  // test("改行を含む関数リテラルのテスト") {
-  //   val parser = Parser(("let k = fn(x, y) {let v = x*2;\nv+y}"))
-  //   parser.parseProgram()._2 match
-  //     case Right(v) => assertEquals(v.toStr, "let k = fn(x, y) {let v = (x * 2);(v + y)};")
-  //     case Left(v) =>
-  //       println(v)
-  //       assert(false)
-  // }
+  test("改行を含む関数リテラルのテスト") {
+    val parsed = parseProgram.runA("let k = fn(x, y) {let v = x*2;\nv+y};")
+    parsed match
+      case Right(v) => assertEquals(v.show, "let k = fn(x, y) {let v = (x * 2);(v + y)};")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
 
   // test("関数呼び出しのテスト") {
   //   val parser = Parser(("add(1 +4, 2)"))

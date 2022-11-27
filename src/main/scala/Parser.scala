@@ -20,10 +20,15 @@ def parseProgram: Parser[Program] = parse()
 private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser[Program] =
   for {
     stmt <- parseStatement
+    preview <- Parser.previewToken
+    stmt <- (stmt, preview) match
+      case (Statement.Expr(_), Token.Semicolon) => Parser.nextToken.map(_ => stmt)
+      case _                                    => Parser.pure(stmt)
     appended = program :+ stmt
-    token <- Parser.previewToken
+    preview <- Parser.previewToken
+
     program <-
-      if token.equals(endToken) then Parser.pure(appended)
+      if preview.equals(endToken) then Parser.pure(appended)
       else parse(appended, endToken)
   } yield program
 
@@ -37,10 +42,11 @@ private def parseStatement: Parser[Statement] = for {
 
 private def parseExprStatement: Parser[Statement] = for {
   expr <- parseExpr()
-  token <- Parser.nextToken
+  token <- Parser.previewToken
   result <- token match
-    case t: (Token.Eof.type | Token.Semicolon.type) => Parser.pure(Statement.Expr(expr))
-    case _                                          => parseExprStatement
+    case t: InfixToken => parseExprStatement
+    case _             => Parser.pure(Statement.Expr(expr))
+
 } yield result
 
 private def parseBlockStatement: Parser[Program] = for {
@@ -48,7 +54,6 @@ private def parseBlockStatement: Parser[Program] = for {
     case t @ Token.LeftBrace => Parser.pure(t)
     case _                   => Utils.fromParserErr(???)
   }
-  // _ <- StateT.get[EitherParserErrorOr, String].map(println)
   program <- parse(Seq(), Token.RightBrace)
 
   rBrace <- Parser.nextToken.flatMap {
@@ -112,7 +117,7 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case t: PrefixToken     => parsePrefixExpr
       case Token.If           => parseIfExpr
       case Token.LeftParen    => parseGroupExpr
-      // case Token.Function     => paraseFnLiteral
+      case Token.Function     => paraseFnLiteral
       case _ =>
         Utils.fromParserErr(ParserError.NotImplemented)
     result <- recurInfix(left)
@@ -151,31 +156,40 @@ private def parseGroupExpr: Parser[Expr] = for {
   }
 } yield result
 
-// private def paraseFnLiteral: Parser[Expr] = for {
-//   fn <- Parser.nextToken.flatMap {
-//     case t @ Token.Function => Parser.pure(t)
-//     case _                  => Utils.fromParserErr(???)
-//   }
-//   args <- Parser.between(Token.LeftParen, Token.RightParen, paraseFnParams())
-//   body <- parseBlockStatement
+private def paraseFnLiteral: Parser[Expr] = for {
+  fn <- Parser.nextToken.flatMap {
+    case t @ Token.Function => Parser.pure(t)
+    case _                  => Utils.fromParserErr(???)
+  }
+  lParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.LeftParen) => Parser.pure(t)
+    case _                              => Utils.fromParserErr(???)
+  }
+  args <- paraseFnParams()
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
 
-// } yield Expr.Fn(args, body)
+  body <- parseBlockStatement
 
-// private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident]] = for {
-//   arg <- Parser.nextToken.flatMap {
-//     case t: Token.Ident => Parser.pure(Expr.Ident(t))
-//     case _              => Utils.fromParserErr(???)
-//   }: Parser[Expr.Ident]
+} yield Expr.Fn(args, body)
 
-//   updatedArgs: Seq[Expr.Ident] = args :+ arg
-//   previewToken <- Parser.previewToken
+private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident]] = for {
+  arg <- Parser.nextToken.flatMap {
+    case t: Token.Ident => Parser.pure(Expr.Ident(t))
+    case _              => Utils.fromParserErr(???)
+  }: Parser[Expr.Ident]
 
-//   result <- previewToken match
-//     case Token.Comma      => Parser.nextToken *> paraseFnParams(updatedArgs)
-//     case Token.RightParen => Parser.pure(updatedArgs)
-//     case _                => Utils.fromParserErr(???)
+  updatedArgs: Seq[Expr.Ident] = args :+ arg
+  previewToken <- Parser.previewToken
 
-// } yield result
+  result <- previewToken match
+    case Token.Comma      => Parser.nextToken *> paraseFnParams(updatedArgs)
+    case Token.RightParen => Parser.pure(updatedArgs)
+    case _                => Utils.fromParserErr(???)
+
+} yield result
 
 // private def parseCallArgs(args: Seq[Expr] = Seq()): Parser[Seq[Expr]] = for {
 //   _ <- log("k")
