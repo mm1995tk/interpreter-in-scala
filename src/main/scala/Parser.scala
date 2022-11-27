@@ -15,15 +15,10 @@ def parseProgram: Parser[Program] = parse()
 private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser[Program] =
   for {
     stmt <- parseStatement
-    preview <- Parser.previewToken
-    stmt <- (stmt, preview) match
-      // セミコロンを読み飛ばす
-      case (Statement.Expr(_), Token.Semicolon) => Parser.nextToken.map(_ => stmt)
-      case _                                    => Parser.pure(stmt)
     appended = program :+ stmt
-    preview <- Parser.previewToken
+    previewToken <- Parser.previewToken
     program <-
-      if preview.equals(endToken) then Parser.pure(appended)
+      if previewToken.equals(endToken) then Parser.pure(appended)
       else parse(appended, endToken)
   } yield program
 
@@ -32,26 +27,6 @@ private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
   case Token.Return => parseReturnStatement
   case _            => parseExprStatement
 }
-
-private def parseExprStatement: Parser[Statement] = for {
-  expr <- parseExpr()
-  token <- Parser.previewToken
-  result <- token match
-    case t: InfixToken => parseExprStatement
-    case _             => Parser.pure(Statement.Expr(expr))
-} yield result
-
-private def parseBlockStatement: Parser[Program] = for {
-  lBrace <- Parser.nextToken.flatMap {
-    case t @ Token.LeftBrace => Parser.pure(t)
-    case _                   => Utils.fromParserErr(???)
-  }
-  program <- parse(Seq(), Token.RightBrace)
-  rBrace <- Parser.nextToken.flatMap {
-    case t @ Token.RightBrace => Parser.pure(t)
-    case _                    => Utils.fromParserErr(???)
-  }
-} yield program
 
 private def parseLetStatement: Parser[Statement] = for {
   let <- Parser.nextToken.flatMap {
@@ -84,6 +59,28 @@ private def parseReturnStatement: Parser[Statement] = for {
     case _                   => Utils.fromParserErr(???)
   }
 } yield Statement.Return(expr)
+
+private def parseExprStatement: Parser[Statement] = for {
+  expr <- parseExpr()
+  token <- Parser.previewToken
+  result <- token match
+    case t: InfixToken => parseExprStatement
+    case _             => Parser.pure(Statement.Expr(expr))
+  preview <- Parser.previewToken
+  _ <- if preview.equals(Token.Semicolon) then Parser.nextToken else Parser.pure(preview)
+} yield result
+
+private def parseBlockStatement: Parser[Program] = for {
+  lBrace <- Parser.nextToken.flatMap {
+    case t @ Token.LeftBrace => Parser.pure(t)
+    case _                   => Utils.fromParserErr(???)
+  }
+  program <- parse(Seq(), Token.RightBrace)
+  rBrace <- Parser.nextToken.flatMap {
+    case t @ Token.RightBrace => Parser.pure(t)
+    case _                    => Utils.fromParserErr(???)
+  }
+} yield program
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
   def recurInfix(left: Expr): Parser[Expr] = for {
