@@ -4,215 +4,236 @@ import ast.*
 import lexer.*
 import token.*
 import scala.annotation.tailrec
+import cats.data.State
+import org.atnos.eff.all._
+import org.atnos.eff.syntax.all._
+import org.atnos.eff._
+import cats.data.{StateT, State}
+import cats.Show
+import cats.implicits.*
 
-sealed case class Parser private (
-    private val lexer: Lexer,
-    private val curToken: Token,
-    private val peekToken: Token
-):
+type EitherParserErrorOr[T] = Either[ParserError, T]
+type Parser[T] = StateT[EitherParserErrorOr, String, T]
 
-  def parseProgram(token: Token = Token.Eof): ParserState[Program] =
-    Parser.parseProgram(this, token)
+def parseProgram: Parser[Program] = parse()
 
-  private def parseStatement: ParserState[Statement] =
-    this.curToken match
-      case Token.Let    => this.parseLetStatement
-      case Token.Return => this.parseReturnStatement
-      case _            => this.parseExprStatement
+private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser[Program] =
+  for {
+    stmt <- parseStatement
+    preview <- Parser.previewToken
+    stmt <- (stmt, preview) match
+      case (Statement.Expr(_), Token.Semicolon) => Parser.nextToken.map(_ => stmt)
+      case _                                    => Parser.pure(stmt)
+    appended = program :+ stmt
+    preview <- Parser.previewToken
+    program <-
+      if preview.equals(endToken) then Parser.pure(appended)
+      else parse(appended, endToken)
+  } yield program
 
-  private def parseLetStatement: ParserState[Statement] =
-    this.peekToken match
-      case ident @ Token.Ident(_) =>
-        val nextParser = this.next
-        if nextParser.peekToken != Token.Assign then
-          nextParser -> Left(ParserError.UnexpectedToken(nextParser.peekToken, Token.Assign))
-        else
-          val (latestParser, eitherExpr) = nextParser.next.next.parseExpr(Precedence.Lowest)
-          latestParser.next -> eitherExpr.map(Statement.Let(ident, _))
-      case token => this -> Left(ParserError.UnexpectedToken(token, Token.Ident("variable names")))
+private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
+  case Token.Let    => parseLetStatement
+  case Token.Return => parseReturnStatement
+  case _            => parseExprStatement
+}
 
-  private def parseReturnStatement: ParserState[Statement] =
-    val (latestParser, eitherExpr) = this.next.parseExpr(Precedence.Lowest)
-    latestParser.next -> eitherExpr.map(Statement.Return(_))
+private def parseExprStatement: Parser[Statement] = for {
+  expr <- parseExpr()
+  token <- Parser.previewToken
+  result <- token match
+    case t: InfixToken => parseExprStatement
+    case _             => Parser.pure(Statement.Expr(expr))
 
-  private def parseExprStatement: ParserState[Statement] =
-    val (parser, result) = this.parseExpr(Precedence.Lowest)
-    val nextParser = if parser.peekToken.equals(Token.Semicolon) then parser.next else parser
-    nextParser -> result.map(Statement.Expr(_))
+} yield result
 
-  private def parseExpr(precedence: Precedence): ParserState[Expr] =
-    val leftExp: ParserState[Expr] = this.curToken match
-      case Token.Null         => this -> Right(Expr.Null)
-      case t @ Token.Ident(_) => this -> Right(Expr.Ident(t))
-      case t @ Token.Int(_)   => this -> Right(Expr.Int(t))
-      case Token.If           => this.parseIfExpr
-      case Token.LeftParen    => this.parseGroupExpr
-      case Token.Function     => this.paraseFnLiteral
-      case t: PrefixToken     => this.parsePrefixExpr(t)
-      case t: BoolToken       => this -> Right(Expr.Bool(t))
-      case _                  => this -> Left(ParserError.NotImplemented)
+private def parseBlockStatement: Parser[Program] = for {
+  lBrace <- Parser.nextToken.flatMap {
+    case t @ Token.LeftBrace => Parser.pure(t)
+    case _                   => Utils.fromParserErr(???)
+  }
+  program <- parse(Seq(), Token.RightBrace)
+  rBrace <- Parser.nextToken.flatMap {
+    case t @ Token.RightBrace => Parser.pure(t)
+    case _                    => Utils.fromParserErr(???)
+  }
+} yield program
 
-    @tailrec def go(item: ParserState[Expr]): ParserState[Expr] =
-      val (parser, either) = item
-      either match
-        case Left(err) => parser -> Left(err)
-        case Right(expr) =>
-          parser.peekToken match
-            case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
-              go(parser.parseInfixExpr(expr))
-            case _ => item
-    end go
+private def parseLetStatement: Parser[Statement] = for {
+  let <- Parser.nextToken.flatMap {
+    case t @ Token.Let => Parser.pure(t)
+    case _             => Utils.fromParserErr(???)
+  }
+  ident <- Parser.nextToken.flatMap {
+    case t: Token.Ident => Parser.pure(t)
+    case _              => Utils.fromParserErr(???)
+  }
+  assign <- Parser.nextToken.flatMap {
+    case t @ Token.Assign => Parser.pure(t)
+    case _                => Utils.fromParserErr(???)
+  }
+  expr <- parseExpr()
+  semicolon <- Parser.nextToken.flatMap {
+    case t @ Token.Semicolon => Parser.pure(t)
+    case _                   => Utils.fromParserErr(???)
+  }
+} yield Statement.Let(ident, expr)
 
-    go(leftExp)
-  end parseExpr
+private def parseReturnStatement: Parser[Statement] = for {
+  returnStmt <- Parser.nextToken.flatMap {
+    case t @ Token.Return => Parser.pure(t)
+    case _                => Utils.fromParserErr(???)
+  }
+  expr <- parseExpr()
+  semicolon <- Parser.nextToken.flatMap {
+    case t @ Token.Semicolon => Parser.pure(t)
+    case _                   => Utils.fromParserErr(???)
+  }
+} yield Statement.Return(expr)
 
-  private def paraseFnLiteral: ParserState[Expr] =
-    if !this.peekToken.equals(Token.LeftParen) then
-      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
+private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
+  def recurInfix(left: Expr): Parser[Expr] = for {
+    previewToken <- Parser.previewToken
 
-    val (parser, params) = this.parseFnParams
-    val (parser2, body) = {
-      if !parser.peekToken.equals(Token.LeftBrace) then
-        return parser -> Left(ParserError.UnexpectedToken(parser.peekToken, Token.LeftBrace))
-      parser.next.next.parseProgram(Token.RightBrace)
-    }
-    parser2 -> {
+    expr <- previewToken match
+      case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
+        parseInfixExpr(left).flatMap(recurInfix)
+      case _ => Parser.pure(left)
+
+  } yield expr
+  for {
+    token <- Parser.previewToken
+    left <- token match
+      case Token.Null         => Parser.nextToken.map(_ => Expr.Null)
+      case t @ Token.Ident(_) => Parser.nextToken.map(_ => Expr.Ident(t))
+      case t @ Token.Int(_)   => Parser.nextToken.map(_ => Expr.Int(t))
+      case t: BoolToken       => Parser.nextToken.map(_ => Expr.Bool(t))
+      case t: PrefixToken     => parsePrefixExpr
+      case Token.If           => parseIfExpr
+      case Token.LeftParen    => parseGroupExpr
+      case Token.Function     => paraseFnLiteral
+      case _                  => Utils.fromParserErr(ParserError.NotImplemented)
+    result <- recurInfix(left)
+  } yield result
+
+private def parsePrefixExpr: Parser[Expr] = for {
+  prefixToken: PrefixToken <- Parser.nextToken.flatMap {
+    case t: PrefixToken => Parser.pure(t)
+    case _              => Utils.fromParserErr(???)
+  }
+  expr <- parseExpr(Precedence.Prefix)
+} yield Expr.Prefix(prefixToken, expr)
+
+private def parseInfixExpr(left: Expr): Parser[Expr] = for {
+  infixToken: InfixToken <- Parser.nextToken.flatMap {
+    case t: InfixToken => Parser.pure(t)
+    case _             => Utils.fromParserErr(???)
+  }
+
+  result <- infixToken match
+    case t @ Token.LeftParen => parseCallFnExpr(left)
+    case _ => parseExpr(getInfixPrecedence(infixToken)).map(Expr.Infix(infixToken, left, _))
+} yield result
+
+private def parseGroupExpr: Parser[Expr] = for {
+  lParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.LeftParen) => Parser.pure(t)
+    case _                              => Utils.fromParserErr(???)
+  }
+  result <- parseExpr()
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
+} yield result
+
+private def paraseFnLiteral: Parser[Expr] = for {
+  fn <- Parser.nextToken.flatMap {
+    case t @ Token.Function => Parser.pure(t)
+    case _                  => Utils.fromParserErr(???)
+  }
+  lParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.LeftParen) => Parser.pure(t)
+    case _                              => Utils.fromParserErr(???)
+  }
+  args <- paraseFnParams()
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
+  body <- parseBlockStatement
+} yield Expr.Fn(args, body)
+
+private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident]] = for {
+  arg <- Parser.nextToken.flatMap {
+    case t: Token.Ident => Parser.pure(Expr.Ident(t))
+    case _              => Utils.fromParserErr(???)
+  }: Parser[Expr.Ident]
+
+  updatedArgs: Seq[Expr.Ident] = args :+ arg
+  previewToken <- Parser.previewToken
+  result <- previewToken match
+    case Token.Comma      => Parser.nextToken *> paraseFnParams(updatedArgs)
+    case Token.RightParen => Parser.pure(updatedArgs)
+    case _                => Utils.fromParserErr(???)
+} yield result
+
+private def parseCallFnExpr(left: Expr): Parser[Expr] = for {
+  fn <- left match
+    case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
+    case _                          => Utils.fromParserErr(???)
+
+  params <- parseCallArgs()
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
+} yield Expr.Call(fn, params)
+
+private def parseCallArgs(args: Seq[Expr] = Seq()): Parser[Seq[Expr]] = for {
+  arg <- parseExpr()
+  updatedArgs: Seq[Expr] = args :+ arg
+  previewToken <- Parser.previewToken
+
+  result <- previewToken match
+    case Token.Comma      => Parser.nextToken *> parseCallArgs(updatedArgs)
+    case Token.RightParen => Parser.pure(updatedArgs)
+    case _                => Utils.fromParserErr(???)
+} yield result
+
+private def parseIfExpr: Parser[Expr] = for {
+  ifToken <- Parser.nextToken.flatMap {
+    case t @ Token.If => Parser.pure(t)
+    case _            => Utils.fromParserErr(???)
+  }
+  cond <- parseGroupExpr
+  consequence <- parseBlockStatement
+  preview <- Parser.previewToken
+  alter <- preview match
+    case Token.Else =>
       for {
-        p <- params
-        b <- body
-      } yield Expr.Fn(p, b)
-    }
+        elseClause <- Parser.nextToken
+        program <- parseBlockStatement
+      } yield Some(program)
+    case _ => Parser.pure(None)
+} yield Expr.If(cond, consequence, alter)
 
-  private def parseFnParams: ParserState[Seq[Expr.Ident]] =
-    if !this.peekToken.equals(Token.LeftParen) then
-      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
-
-    val n = this.next
-    if n.peekToken.equals(Token.RightParen) then return n -> Right(Seq())
-
-    @tailrec def rec(item: ParserState[Seq[Expr.Ident]]): ParserState[Seq[Expr.Ident]] =
-      if !item._1.peekToken.equals(Token.Comma) then return item
-      val parser = item._1.next.next
-      parser.curToken match
-        case t @ Token.Ident(_) => rec(parser -> item._2.map(_.concat(Seq(Expr.Ident(t)))))
-        case t                  => parser -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
-    end rec
-
-    val nn = n.next
-    nn.curToken match
-      case t @ Token.Ident(_) =>
-        val (p, expr) = rec(nn -> Right(Seq(Expr.Ident(t))))
-        p.next -> expr
-      case t => nn -> Left(ParserError.UnexpectedToken(t, Token.Ident("vars")))
-  end parseFnParams
-
-  private def parsePrefixExpr(ident: PrefixToken): ParserState[Expr] =
-    val (latestParser, expr) = this.next.parseExpr(Precedence.Prefix)
-    latestParser -> expr.map(Expr.Prefix(ident, _))
-
-  private def parseInfixExpr(left: Expr): ParserState[Expr] =
-    this.peekToken match
-      case leftParen @ Token.LeftParen =>
-        left match
-          case fn: (Expr.Fn | Expr.Ident) =>
-            val (p, expr) = this.parseCallArgs
-            p -> expr.map(Expr.Call(fn, _))
-          case _ => this -> Left(ParserError.NotImplemented)
-      case infixToken: InfixToken =>
-        val (p, expr) = this.next.next.parseExpr(getInfixPrecedence(infixToken))
-        p -> expr.map(Expr.Infix(infixToken, left, _))
-      case other => this -> Left(ParserError.UnexpectedToken(other, Token.Ident("infix token")))
-
-  private def parseCallArgs: ParserState[Seq[Expr]] =
-    val n = this.next
-    if n.peekToken.equals(Token.RightParen) then return n -> Right(Seq())
-
-    @tailrec def rec(item: ParserState[Seq[Expr]]): ParserState[Seq[Expr]] =
-      if !item._1.peekToken.equals(Token.Comma) then return item
-      val (parser, expr) = item._1.next.next.parseExpr(Precedence.Lowest)
-
-      val result = for {
-        seq <- item._2
-        expr <- expr
-      } yield seq :+ expr
-
-      rec(parser -> result)
-    end rec
-
-    val nn = n.next
-    val (a, b) = nn.parseExpr(Precedence.Lowest)
-    val (p, v) = rec(a -> b.map(Seq(_)))
-    p.next -> v
-
-  end parseCallArgs
-
-  private def parseBlockStatement: ParserState[Program] =
-    if !this.peekToken.equals(Token.LeftBrace) then
-      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftBrace))
-    val (parser, eitherStmts) = this.next.next.parseProgram(Token.RightBrace)
-    parser.next -> eitherStmts
-
-  private def parseIfExpr: ParserState[Expr] =
-    if !this.peekToken.equals(Token.LeftParen) then
-      return this -> Left(ParserError.UnexpectedToken(this.peekToken, Token.LeftParen))
-
-    val (parser, notValidatedEitherCond) = this.next.parseExpr(Precedence.Lowest)
-    val validatedEitherCond = notValidatedEitherCond.flatMap(expr =>
-      val isRightParenToken = parser.curToken.equals(Token.RightParen)
-      if isRightParenToken && parser.peekToken.equals(Token.LeftBrace) then Right(expr)
-      else if isRightParenToken then Left(ParserError.UnexpectedToken(parser.curToken, Token.RightParen))
-      else Left(ParserError.UnexpectedToken(parser.peekToken, Token.LeftBrace))
-    )
-
-    val (parsedByIf, eitherConseq) = parser.parseBlockStatement
-
-    val (parsedByElse, eitherAlter): ParserState[Option[Program]] =
-      if parsedByIf.curToken.equals(Token.Else) then
-        val (parser, alter) = parsedByIf.parseBlockStatement
-        parser -> alter.map(Some(_))
-      else parsedByIf -> Right(None)
-
-    parsedByElse -> {
-      for {
-        cond <- validatedEitherCond
-        conseq <- eitherConseq
-        alter <- eitherAlter
-      } yield Expr.If(cond, conseq, alter)
-    }
-  end parseIfExpr
-
-  private def parseGroupExpr: ParserState[Expr] =
-    val (latestParser, expr) = this.next.parseExpr(Precedence.Lowest)
-    latestParser.peekToken match
-      case Token.RightParen => latestParser.next -> expr
-      case other            => this -> Left(ParserError.UnexpectedToken(other, Token.RightParen))
-
-  private def next: Parser =
-    val (nextLexer, token) = getToken(lexer)
-    this.copy(lexer = nextLexer, curToken = this.peekToken, peekToken = token)
-
-end Parser
+def log(str: String): Parser[Unit] = Parser.previewToken.map(item => println(s"$str: $item"))
 
 object Parser:
-  def apply(lexer: Lexer) =
-    val (secondLexer, curToken) = getToken(lexer)
-    val (thirdLexer, peekToken) = getToken(secondLexer)
-    new Parser(thirdLexer, curToken, peekToken)
+  def pure[T](t: T): Parser[T] = StateT.pure(t)
 
-  @tailrec private def parseProgram(
-      parser: Parser,
-      endToken: Token,
-      acc: Either[ParserError, Program] = Right(Seq())
-  ): ParserState[Program] =
-    if parser.curToken.equals(endToken) then return parser -> acc
+  def nextToken: Parser[Token] =
+    StateT.fromState[EitherParserErrorOr, String, Token](lexer.tokenize.map(Right(_)))
 
-    val parsed = parser.parseStatement
-    parsed._2 match
-      case Right(stmt) => parseProgram(parsed._1.next, endToken, acc.map(_ :+ stmt))
-      case Left(e)     => parsed._1 -> Left(e)
-  end parseProgram
+  def previewToken: Parser[Token] = for {
+    str <- StateT.get
+    token <- nextToken
+    _ <- StateT.set(str)
+  } yield token
 
-private type ParserState[T] = (Parser, Either[ParserError, T])
+object Utils:
+  def fromParserErr[T](err: ParserError) = Utils.liftParser[T](Left(err))
+  def liftParser[T] = StateT.lift[EitherParserErrorOr, String, T]
 
 enum ParserError:
   def show: String = this match
@@ -222,6 +243,12 @@ enum ParserError:
 
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
+
+given Show[ParserError] with
+  def show(t: ParserError): String = t match
+    case ParserError.NotImplemented => "not impl"
+    case ParserError.UnexpectedToken(obtained, expected) =>
+      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
 
 private enum Precedence:
   def <(target: Precedence) = this.ordinal < target.ordinal
