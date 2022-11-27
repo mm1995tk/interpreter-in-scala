@@ -126,7 +126,6 @@ private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = fo
   expOfL: MonkeyPrimitiveType <- evalExpr(item.left).map(_.unwrap)
   expOfR: MonkeyPrimitiveType <- evalExpr(item.right).map(_.unwrap)
   result <- (item.token match
-    case Token.LeftParen => ???
     case t: (Token.Eq.type | Token.NotEq.type) =>
       StateT.pure(Object.Boolean {
         t match

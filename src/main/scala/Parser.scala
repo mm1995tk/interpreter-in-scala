@@ -82,6 +82,7 @@ private def parseBlockStatement: Parser[Program] = for {
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
   def recurInfix(left: Expr): Parser[Expr] = Parser.previewToken.flatMap {
+    case Token.LeftParen => parseCallFnExpr(left)
     case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
       parseInfixExpr(left).flatMap(recurInfix)
     case _ => Parser.pure(left)
@@ -110,16 +111,10 @@ private def parsePrefixExpr: Parser[Expr] = for {
   expr <- parseExpr(Precedence.Prefix)
 } yield Expr.Prefix(prefixToken, expr)
 
-private def parseInfixExpr(left: Expr): Parser[Expr] = for {
-  infixToken: InfixToken <- Parser.nextToken.flatMap {
-    case t: InfixToken => Parser.pure(t)
-    case _             => Utils.fromParserErr(???)
-  }
-
-  result <- infixToken match
-    case t @ Token.LeftParen => parseCallFnExpr(left)
-    case _ => parseExpr(getInfixPrecedence(infixToken)).map(Expr.Infix(infixToken, left, _))
-} yield result
+private def parseInfixExpr(left: Expr): Parser[Expr] = Parser.nextToken.flatMap {
+  case t: InfixToken => parseExpr(getInfixPrecedence(t)).map(Expr.Infix(t, left, _))
+  case _             => Utils.fromParserErr(???)
+}
 
 private def parseGroupExpr: Parser[Expr] = for {
   lParen <- Parser.nextToken.flatMap {
@@ -138,10 +133,7 @@ private def paraseFnLiteral: Parser[Expr] = for {
     case t @ Token.Function => Parser.pure(t)
     case _                  => Utils.fromParserErr(???)
   }
-  lParen <- Parser.nextToken.flatMap {
-    case t if t.equals(Token.LeftParen) => Parser.pure(t)
-    case _                              => Utils.fromParserErr(???)
-  }
+
   args <- parseArgs(Parser.nextToken.flatMap {
     case t: Token.Ident => Parser.pure(Expr.Ident(t))
     case _              => Utils.fromParserErr(???)
@@ -149,19 +141,31 @@ private def paraseFnLiteral: Parser[Expr] = for {
   body <- parseBlockStatement
 } yield Expr.Fn(args, body)
 
-private def parseCallFnExpr(left: Expr): Parser[Expr] = for {
-  fn <- left match
+private def parseCallFnExpr(symbol: Expr): Parser[Expr] = for {
+  sym <- symbol match
     case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
     case _                          => Utils.fromParserErr(???)
   params <- parseArgs(parseExpr())
-} yield Expr.Call(fn, params)
+} yield Expr.Call(sym, params)
 
 private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] = for {
+  lParen <- Parser.nextToken.flatMap {
+    case t @ Token.LeftParen => Parser.pure(t)
+    case _                   => Utils.fromParserErr(???)
+  }
+  args <- parseArgsCore(parserOfArg, args)
+  rParen <- Parser.nextToken.flatMap {
+    case t @ Token.RightParen => Parser.pure(t)
+    case _                    => Utils.fromParserErr(???)
+  }
+} yield args
+
+private def parseArgsCore[T](parserOfArg: Parser[T], args: Seq[T]): Parser[Seq[T]] = for {
   arg <- parserOfArg
   updatedArgs: Seq[T] = args :+ arg
   args <- Parser.previewToken.flatMap {
-    case Token.Comma      => Parser.nextToken *> parseArgs(parserOfArg, updatedArgs)
-    case Token.RightParen => Parser.nextToken *> Parser.pure(updatedArgs)
+    case Token.Comma      => Parser.nextToken *> parseArgsCore(parserOfArg, updatedArgs)
+    case Token.RightParen => Parser.pure(updatedArgs)
     case _                => Utils.fromParserErr(???)
   }
 } yield args
@@ -214,7 +218,7 @@ private enum Precedence:
   def >(target: Precedence) = this.ordinal > target.ordinal
   case Lowest, Equals, LessOrGreater, Sum, Product, Prefix, Call
 
-private def getInfixPrecedence(token: InfixToken): Precedence = token match
+private def getInfixPrecedence(token: InfixToken | Token.LeftParen.type): Precedence = token match
   case Token.Plus      => Precedence.Sum
   case Token.Minus     => Precedence.Sum
   case Token.Asterisk  => Precedence.Product
