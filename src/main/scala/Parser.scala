@@ -178,7 +178,7 @@ private def parseBetweenParen[T](parser: Parser[T]): Parser[T] = for {
   }
 } yield main
 
-object Parser:
+private object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
 
   def nextToken: Parser[Token] =
@@ -190,7 +190,7 @@ object Parser:
     _ <- StateT.set(str)
   } yield token
 
-object Utils:
+private object Utils:
   def fromParserErr[T](err: ParserError) = Utils.liftParser[T](Left(err))
   def liftParser[T] = StateT.lift[EitherParserErrorOr, String, T]
 
