@@ -109,21 +109,6 @@ class ParserTest extends munit.FunSuite {
       case None => assert(false)
   }
 
-  // test("let文解析エラーのテスト") {
-  //   val input = "let x  5;\nlet  = 10;\nlet 838383;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2
-
-  //   stmts match
-  //     case Right(_) => assert(false)
-  //     case Left(err) =>
-  //       assertEquals(
-  //         err,
-  //         ParserError.UnexpectedToken(Token.Int(5), Token.Assign)
-  //       )
-
-  // }
-
   test("return文のテスト") {
     val input = "return  5;\nreturn 15+5-10;\nreturn 838383;"
     val parsed = parseProgram.runA(input)
@@ -190,25 +175,25 @@ class ParserTest extends munit.FunSuite {
         assert(false)
   }
 
-  // test("関数呼び出しのテスト") {
-  //   val parser = Parser(("add(1 +4, 2)"))
-  //   parser.parseProgram()._2 match
-  //     case Right(v) => assertEquals(v.toStr, "add((1 + 4), 2)")
-  //     case Left(v) =>
-  //       println(v)
-  //       assert(false)
+  test("関数呼び出しのテスト") {
+    val parsed = parseProgram.runA("add(1 +4, 2)")
+    parsed match
+      case Right(v) => assertEquals(v.show, "add((1 + 4), 2)")
+      case Left(v) =>
+        println(v)
+        assert(false)
 
-  // }
+  }
 
-  // test("関数呼び出しのテスト(即時実行)") {
-  //   val parser = Parser(("fn(x, y) {x+ y}(1 +4, 2)"))
-  //   parser.parseProgram()._2 match
-  //     case Right(v) => assertEquals(v.toStr, "fn(x, y) {(x + y)}((1 + 4), 2)")
-  //     case Left(v) =>
-  //       println(v)
-  //       assert(false)
+  test("関数呼び出しのテスト(即時実行)") {
+    val parsed = parseProgram.runA("fn(x, y) {x+ y}(1 +4, 2)")
+    parsed match
+      case Right(v) => assertEquals(v.show, "fn(x, y) {(x + y)}((1 + 4), 2)")
+      case Left(v) =>
+        println(v)
+        assert(false)
 
-  // }
+  }
 }
 
 val 異なる優先度の演算子が混在するテストのデータ = Seq(

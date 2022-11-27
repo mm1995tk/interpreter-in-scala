@@ -130,7 +130,7 @@ private def parseInfixExpr(left: Expr): Parser[Expr] = for {
   }
 
   result <- infixToken match
-    case t @ Token.LeftParen => ???
+    case t @ Token.LeftParen => parseCallFnExpr(left)
     case _ => parseExpr(getInfixPrecedence(infixToken)).map(Expr.Infix(infixToken, left, _))
 } yield result
 
@@ -177,18 +177,28 @@ private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident
     case _                => Utils.fromParserErr(???)
 } yield result
 
-// private def parseCallArgs(args: Seq[Expr] = Seq()): Parser[Seq[Expr]] = for {
-//   _ <- log("k")
-//   arg <- parseExpr()
-//   _ = println(s"arg: $arg")
-//   updatedArgs: Seq[Expr] = args :+ arg
-//   previewToken <- Parser.previewToken
+private def parseCallFnExpr(left: Expr): Parser[Expr] = for {
+  fn <- left match
+    case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
+    case _                          => Utils.fromParserErr(???)
 
-//   result <- previewToken match
-//     case Token.Comma      => parseCallArgs(updatedArgs)
-//     case Token.RightParen => Parser.pure(updatedArgs)
-//     case _                => Utils.fromParserErr(???)
-// } yield result
+  params <- parseCallArgs()
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
+} yield Expr.Call(fn, params)
+
+private def parseCallArgs(args: Seq[Expr] = Seq()): Parser[Seq[Expr]] = for {
+  arg <- parseExpr()
+  updatedArgs: Seq[Expr] = args :+ arg
+  previewToken <- Parser.previewToken
+
+  result <- previewToken match
+    case Token.Comma      => Parser.nextToken *> parseCallArgs(updatedArgs)
+    case Token.RightParen => Parser.pure(updatedArgs)
+    case _                => Utils.fromParserErr(???)
+} yield result
 
 private def parseIfExpr: Parser[Expr] = for {
   ifToken <- Parser.nextToken.flatMap {
