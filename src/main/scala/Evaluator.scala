@@ -18,13 +18,13 @@ type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 
 def evalProgram(program: Program): Evaluator[Object] =
   program.headOption match
-    case None => StateT.lift(Right { ConstNull })
+    case None => StateT.pure(ConstNull)
     case Some(h) =>
       program.tail.foldLeft(evalStatement(h)) { (acc, cur) =>
         for {
           obj <- acc
           result <- obj match
-            case Object.ReturnValue(obj) => Utils.liftEvaluator[Object](Right(obj))
+            case Object.ReturnValue(obj) => StateT.pure[EitherEvalErrorOr, Env, Object](obj)
             case _                       => evalStatement(cur)
         } yield result
       }
@@ -41,18 +41,19 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
     for {
       monkeyPrimitiveType: MonkeyPrimitiveType <- evalExpr(expr).map(_.unwrap)
       env <- Utils.getEnv
-      _ <- Utils.setEnv(env.updated(ident.value, monkeyPrimitiveType))
+      updatedEnv: Env = env.updated(ident.value, monkeyPrimitiveType)
+      _ <- Utils.setEnv(updatedEnv)
     } yield ConstNull
 
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Utils.liftEvaluator[Object](Right(Object.Int(v)))
   case Expr.Bool(t) =>
-    Utils.liftEvaluator[Object](Right(Object.Boolean(t.equals(Token.True))))
+    StateT.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix =>
     evalPrefixExpr(expr).map((item: Object) => item)
   case expr: Expr.Infix    => evalInfixExpr(expr).map((item: Object) => item)
   case expr: Expr.If       => evalIfExpr(expr).map((item: Object) => item)
-  case Expr.Null           => Utils.liftEvaluator[Object](Right(ConstNull))
+  case Expr.Null           => StateT.pure(ConstNull)
   case Expr.Call(fn, args) => evalCallExpr(fn, args)
   case Expr.Ident(t @ Token.Ident(key)) =>
     for {
@@ -75,7 +76,7 @@ private def evalCallExpr(
   env <- Utils.getEnv
   fnObj <- {
     fn match
-      case Expr.Fn(params, body) => StateT.lift(Right { Object.Function(params.map(_.token), body, env) })
+      case Expr.Fn(params, body) => StateT.pure(Object.Function(params.map(_.token), body, env))
 
       case Expr.Ident(t @ Token.Ident(key)) =>
         StateT.lift {
@@ -100,9 +101,8 @@ private def evalCallExpr(
   localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
     acc.updated(cur._1, cur._2)
   }
-  _ <- Utils.setEnv(env.concat(localEnv))
-  result <- evalProgram(fnObj.program)
-  _ <- Utils.setEnv(env)
+
+  result <- Utils.setEnv(env.concat(localEnv)) *> evalProgram(fnObj.program) <* Utils.setEnv(env)
 } yield result
 
 private def evalPrefixExpr(item: Expr.Prefix): Evaluator[MonkeyPrimitiveType] =
@@ -129,11 +129,11 @@ private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = fo
   result <- (item.token match
     case Token.LeftParen => ???
     case t: (Token.Eq.type | Token.NotEq.type) =>
-      StateT.lift(Right(Object.Boolean {
+      StateT.pure(Object.Boolean {
         t match
           case Token.Eq    => expOfL == expOfR
           case Token.NotEq => expOfL != expOfR
-      }))
+      })
 
     case t: (Token.Plus.type | Token.Asterisk.type) => evalPlusOrMulOpInfixExpr(t, expOfL, expOfR)
     case t: (Token.Minus.type | Token.Slash.type)   => evalMinusOrModOpInfixExpr(t, expOfL, expOfR)
@@ -204,7 +204,7 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
 
   evalExpr(item.cond).flatMap {
     case Object.Boolean(bool)      => if bool then consequence else alter
-    case Object.ReturnValue(value) => StateT.lift(Right(value))
+    case Object.ReturnValue(value) => StateT.pure(value)
     case Object.Null               => alter
     case Object.Int(value)         => consequence
     case _: Object.Function        => consequence
