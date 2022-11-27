@@ -165,11 +165,11 @@ private def parseCallFnExpr(left: Expr): Parser[Expr] = for {
   }
 } yield Expr.Call(fn, params)
 
-private def parseArgs[T](parseOne: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] = for {
-  arg <- parseOne
+private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] = for {
+  arg <- parserOfArg
   updatedArgs: Seq[T] = args :+ arg
   args <- Parser.previewToken.flatMap {
-    case Token.Comma      => Parser.nextToken *> parseArgs(parseOne, updatedArgs)
+    case Token.Comma      => Parser.nextToken *> parseArgs(parserOfArg, updatedArgs)
     case Token.RightParen => Parser.pure(updatedArgs)
     case _                => Utils.fromParserErr(???)
   }
