@@ -61,16 +61,12 @@ private def parseReturnStatement: Parser[Statement] = for {
 } yield Statement.Return(expr)
 
 private def parseExprStatement: Parser[Statement] = for {
-  leftExpr <- parseExpr()
-  expr <- Parser.previewToken.flatMap {
-    case t: InfixToken => parseExprStatement
-    case _             => Parser.pure(Statement.Expr(leftExpr))
-  }
+  expr <- parseExpr()
   optionalSemicolon <- Parser.previewToken.flatMap {
     case Token.Semicolon => Parser.nextToken.map(Some.apply)
     case _               => Parser.pure(None)
   }
-} yield expr
+} yield Statement.Expr(expr)
 
 private def parseBlockStatement: Parser[Program] = for {
   lBrace <- Parser.nextToken.flatMap {
