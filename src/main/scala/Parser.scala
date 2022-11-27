@@ -32,13 +32,11 @@ private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser
       else parse(appended, endToken)
   } yield program
 
-private def parseStatement: Parser[Statement] = for {
-  f <- Parser.previewToken.flatMap {
-    case Token.Let    => parseLetStatement
-    case Token.Return => parseReturnStatement
-    case _            => parseExprStatement
-  }
-} yield f
+private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
+  case Token.Let    => parseLetStatement
+  case Token.Return => parseReturnStatement
+  case _            => parseExprStatement
+}
 
 private def parseExprStatement: Parser[Statement] = for {
   expr <- parseExpr()
