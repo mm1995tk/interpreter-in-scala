@@ -17,6 +17,7 @@ private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser
     stmt <- parseStatement
     preview <- Parser.previewToken
     stmt <- (stmt, preview) match
+      // セミコロンを読み飛ばす
       case (Statement.Expr(_), Token.Semicolon) => Parser.nextToken.map(_ => stmt)
       case _                                    => Parser.pure(stmt)
     appended = program :+ stmt
@@ -38,7 +39,6 @@ private def parseExprStatement: Parser[Statement] = for {
   result <- token match
     case t: InfixToken => parseExprStatement
     case _             => Parser.pure(Statement.Expr(expr))
-
 } yield result
 
 private def parseBlockStatement: Parser[Program] = for {
@@ -212,7 +212,6 @@ private def parseIfExpr: Parser[Expr] = for {
     case _ => Parser.pure(None)
 } yield Expr.If(cond, consequence, alter)
 
-
 object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
 
@@ -230,11 +229,6 @@ object Utils:
   def liftParser[T] = StateT.lift[EitherParserErrorOr, String, T]
 
 enum ParserError:
-  def show: String = this match
-    case NotImplemented => "not impl"
-    case UnexpectedToken(obtained, expected) =>
-      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
-
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
 
