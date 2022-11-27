@@ -1,7 +1,6 @@
 package lexer
 
 import token.Token
-import scala.annotation.tailrec
 import cats.data.State
 
 type Lexer = State[String, Token]

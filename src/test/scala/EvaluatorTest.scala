@@ -1,11 +1,8 @@
-import token.Token.*
-import lexer.Lexer
 import parser.{parseProgram}
 import env.Env
 import evaluator.evalProgram
 import obj.{getValue, Object, MonkeyPrimitiveType}
 import cats.implicits.toShow
-import ast.given
 
 class EvaluatorTest extends munit.FunSuite {
   test("数値の評価") {

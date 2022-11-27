@@ -1,7 +1,6 @@
 package evaluator
 
 import ast.*
-import lexer.*
 import obj.*
 import ast.{Statement, Expr}
 import token.{Token, InfixToken, PrefixToken}

@@ -3,6 +3,8 @@ package obj
 import token.{InfixToken, Token}
 import ast.{Statement, Program}
 import env.Env
+import cats.Show
+import cats.implicits.toShow
 
 enum Object:
   def unwrap: MonkeyPrimitiveType = this match
@@ -24,8 +26,16 @@ extension (item: MonkeyPrimitiveType)
     case Object.Null              => "null"
     case Object.Function(_, _, _) => "function"
 
-  def getValue = item match
+  def getValue: Option[Int | Boolean | String] = item match
     case Object.Int(v)            => Some(v)
     case Object.Boolean(v)        => Some(v)
-    case Object.Function(_, _, _) => Some("function")
+    case Object.Function(_, _, _) => Some(item.asInstanceOf[Object].show)
     case Object.Null              => None
+
+given Show[Object] with
+  def show(obj: Object) = obj match
+    case Object.Int(value)         => value.toString()
+    case Object.Boolean(value)     => value.toString()
+    case Object.ReturnValue(value) => value.getValue.getOrElse("null").toString()
+    case Object.Function(_, _, _)  => "function"
+    case Object.Null               => "null"
