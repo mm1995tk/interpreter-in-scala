@@ -3,11 +3,6 @@ package parser
 import ast.*
 import lexer.*
 import token.*
-import scala.annotation.tailrec
-import cats.data.State
-import org.atnos.eff.all._
-import org.atnos.eff.syntax.all._
-import org.atnos.eff._
 import cats.data.{StateT, State}
 import cats.Show
 import cats.implicits.*
@@ -217,7 +212,6 @@ private def parseIfExpr: Parser[Expr] = for {
     case _ => Parser.pure(None)
 } yield Expr.If(cond, consequence, alter)
 
-def log(str: String): Parser[Unit] = Parser.previewToken.map(item => println(s"$str: $item"))
 
 object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
