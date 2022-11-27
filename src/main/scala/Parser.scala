@@ -26,7 +26,6 @@ private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser
       case _                                    => Parser.pure(stmt)
     appended = program :+ stmt
     preview <- Parser.previewToken
-
     program <-
       if preview.equals(endToken) then Parser.pure(appended)
       else parse(appended, endToken)
@@ -53,7 +52,6 @@ private def parseBlockStatement: Parser[Program] = for {
     case _                   => Utils.fromParserErr(???)
   }
   program <- parse(Seq(), Token.RightBrace)
-
   rBrace <- Parser.nextToken.flatMap {
     case t @ Token.RightBrace => Parser.pure(t)
     case _                    => Utils.fromParserErr(???)
@@ -74,12 +72,10 @@ private def parseLetStatement: Parser[Statement] = for {
     case _                => Utils.fromParserErr(???)
   }
   expr <- parseExpr()
-
   semicolon <- Parser.nextToken.flatMap {
     case t @ Token.Semicolon => Parser.pure(t)
     case _                   => Utils.fromParserErr(???)
   }
-
 } yield Statement.Let(ident, expr)
 
 private def parseReturnStatement: Parser[Statement] = for {
@@ -105,7 +101,6 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
 
   } yield expr
   for {
-
     token <- Parser.previewToken
     left <- token match
       case Token.Null         => Parser.nextToken.map(_ => Expr.Null)
@@ -116,10 +111,8 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.If           => parseIfExpr
       case Token.LeftParen    => parseGroupExpr
       case Token.Function     => paraseFnLiteral
-      case _ =>
-        Utils.fromParserErr(ParserError.NotImplemented)
+      case _                  => Utils.fromParserErr(ParserError.NotImplemented)
     result <- recurInfix(left)
-
   } yield result
 
 private def parsePrefixExpr: Parser[Expr] = for {
@@ -128,7 +121,6 @@ private def parsePrefixExpr: Parser[Expr] = for {
     case _              => Utils.fromParserErr(???)
   }
   expr <- parseExpr(Precedence.Prefix)
-
 } yield Expr.Prefix(prefixToken, expr)
 
 private def parseInfixExpr(left: Expr): Parser[Expr] = for {
@@ -168,9 +160,7 @@ private def paraseFnLiteral: Parser[Expr] = for {
     case t if t.equals(Token.RightParen) => Parser.pure(t)
     case _                               => Utils.fromParserErr(???)
   }
-
   body <- parseBlockStatement
-
 } yield Expr.Fn(args, body)
 
 private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident]] = for {
@@ -181,12 +171,10 @@ private def paraseFnParams(args: Seq[Expr.Ident] = Seq()): Parser[Seq[Expr.Ident
 
   updatedArgs: Seq[Expr.Ident] = args :+ arg
   previewToken <- Parser.previewToken
-
   result <- previewToken match
     case Token.Comma      => Parser.nextToken *> paraseFnParams(updatedArgs)
     case Token.RightParen => Parser.pure(updatedArgs)
     case _                => Utils.fromParserErr(???)
-
 } yield result
 
 // private def parseCallArgs(args: Seq[Expr] = Seq()): Parser[Seq[Expr]] = for {
