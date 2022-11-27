@@ -6,8 +6,7 @@ import cats.data.State
 type Lexer = State[String, Token]
 
 def tokenize: Lexer = next.flatMap {
-  case char @ '='            => twoCharLexer(char)
-  case char @ '!'            => twoCharLexer(char)
+  case char: ('=' | '!')     => twoCharLexer(char)
   case char: CodeLiteral     => State.pure(char.convertCharOfCodeToToken)
   case char if char.isDigit  => numberLexer(char.toString())
   case char if char.isLetter => identifierLexer(char.toString())
