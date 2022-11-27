@@ -10,6 +10,7 @@ import token.showLiteral
 import env.Env
 import cats.implicits._
 import cats.data.StateT
+import cats.Show
 
 type EitherEvalErrorOr[T] = Either[EvalError, T]
 
@@ -41,7 +42,7 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
       monkeyPrimitiveType: MonkeyPrimitiveType <- evalExpr(expr).map(_.unwrap)
       env <- Utils.getEnv
       _ <- Utils.setEnv(env.updated(ident.value, monkeyPrimitiveType))
-    } yield monkeyPrimitiveType
+    } yield ConstNull
 
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Utils.liftEvaluator[Object](Right(Object.Int(v)))
@@ -217,14 +218,17 @@ private object Utils:
   def setEnv = StateT.set[EitherEvalErrorOr, Env]
 
 enum EvalError:
-  def show: String = this match
-    case TypeMismatch(l, r, op) =>
-      s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
-    case UncaughtReferenceError(Token.Ident(key)) => s"uncaught referenceError: $key is not defined"
-    case UnknownOperator(op, value)               => s"unknown operator: ${op.showLiteral}${value.getType}"
-    case CountOfArgsMismatch(obtained, expected) =>
-      s"expected count of args is $expected, but got $obtained"
   case TypeMismatch(left: MonkeyPrimitiveType, right: MonkeyPrimitiveType, op: InfixToken)
   case UncaughtReferenceError(ident: Token.Ident)
   case UnknownOperator(op: PrefixToken, value: MonkeyPrimitiveType)
   case CountOfArgsMismatch(obtained: Int, expected: Int)
+
+given Show[EvalError] with
+  def show(t: EvalError): String = t match
+    case EvalError.TypeMismatch(l, r, op) =>
+      s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
+    case EvalError.UncaughtReferenceError(Token.Ident(key)) =>
+      s"uncaught referenceError: $key is not defined"
+    case EvalError.UnknownOperator(op, value) => s"unknown operator: ${op.showLiteral}${value.getType}"
+    case EvalError.CountOfArgsMismatch(obtained, expected) =>
+      s"expected count of args is $expected, but got $obtained"
