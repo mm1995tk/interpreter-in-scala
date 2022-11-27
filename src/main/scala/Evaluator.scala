@@ -15,18 +15,15 @@ type EitherEvalErrorOr[T] = Either[EvalError, T]
 
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 
-def evalProgram(program: Program): Evaluator[Object] =
-  program.headOption match
-    case None => StateT.pure(ConstNull)
-    case Some(h) =>
-      program.tail.foldLeft(evalStatement(h)) { (acc, cur) =>
-        for {
-          obj <- acc
-          result <- obj match
-            case Object.ReturnValue(obj) => StateT.pure[EitherEvalErrorOr, Env, Object](obj)
-            case _                       => evalStatement(cur)
-        } yield result
+def evalProgram(program: Program): Evaluator[Object] = program match
+  case Seq() => StateT.pure(ConstNull)
+  case h :: tail =>
+    tail.foldLeft(evalStatement(h)) { (acc, cur) =>
+      acc.flatMap {
+        case Object.ReturnValue(obj) => StateT.pure(obj)
+        case _                       => evalStatement(cur)
       }
+    }
 
 private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
   case Statement.Expr(expr) => evalExpr(expr)
