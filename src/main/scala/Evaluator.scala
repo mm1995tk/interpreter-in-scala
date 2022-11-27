@@ -42,7 +42,7 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
       monkeyPrimitiveType: MonkeyPrimitiveType <- evalExpr(expr).map(_.unwrap)
       env <- Utils.getEnv
       _ <- Utils.setEnv(env.updated(ident.value, monkeyPrimitiveType))
-    } yield monkeyPrimitiveType
+    } yield ConstNull
 
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Utils.liftEvaluator[Object](Right(Object.Int(v)))
