@@ -61,14 +61,16 @@ private def parseReturnStatement: Parser[Statement] = for {
 } yield Statement.Return(expr)
 
 private def parseExprStatement: Parser[Statement] = for {
-  expr <- parseExpr()
-  token <- Parser.previewToken
-  result <- token match
+  leftExpr <- parseExpr()
+  expr <- Parser.previewToken.flatMap {
     case t: InfixToken => parseExprStatement
-    case _             => Parser.pure(Statement.Expr(expr))
-  preview <- Parser.previewToken
-  _ <- if preview.equals(Token.Semicolon) then Parser.nextToken else Parser.pure(preview)
-} yield result
+    case _             => Parser.pure(Statement.Expr(leftExpr))
+  }
+  optionalSemicolon <- Parser.previewToken.flatMap {
+    case Token.Semicolon => Parser.nextToken.map(Some.apply)
+    case _               => Parser.pure(None)
+  }
+} yield expr
 
 private def parseBlockStatement: Parser[Program] = for {
   lBrace <- Parser.nextToken.flatMap {
@@ -199,14 +201,14 @@ private def parseIfExpr: Parser[Expr] = for {
   }
   cond <- parseGroupExpr
   consequence <- parseBlockStatement
-  preview <- Parser.previewToken
-  alter <- preview match
+  alter <- Parser.previewToken.flatMap {
     case Token.Else =>
       for {
         elseClause <- Parser.nextToken
         program <- parseBlockStatement
       } yield Some(program)
     case _ => Parser.pure(None)
+  }
 } yield Expr.If(cond, consequence, alter)
 
 object Parser:
