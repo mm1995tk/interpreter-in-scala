@@ -116,60 +116,6 @@ private def parseInfixExpr(left: Expr): Parser[Expr] = Parser.nextToken.flatMap 
   case _             => Utils.fromParserErr(???)
 }
 
-private def parseGroupExpr: Parser[Expr] = for {
-  lParen <- Parser.nextToken.flatMap {
-    case t if t.equals(Token.LeftParen) => Parser.pure(t)
-    case _                              => Utils.fromParserErr(???)
-  }
-  result <- parseExpr()
-  rParen <- Parser.nextToken.flatMap {
-    case t if t.equals(Token.RightParen) => Parser.pure(t)
-    case _                               => Utils.fromParserErr(???)
-  }
-} yield result
-
-private def paraseFnLiteral: Parser[Expr] = for {
-  fn <- Parser.nextToken.flatMap {
-    case t @ Token.Function => Parser.pure(t)
-    case _                  => Utils.fromParserErr(???)
-  }
-
-  args <- parseArgs(Parser.nextToken.flatMap {
-    case t: Token.Ident => Parser.pure(Expr.Ident(t))
-    case _              => Utils.fromParserErr(???)
-  }: Parser[Expr.Ident])
-  body <- parseBlockStatement
-} yield Expr.Fn(args, body)
-
-private def parseCallFnExpr(symbol: Expr): Parser[Expr] = for {
-  sym <- symbol match
-    case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
-    case _                          => Utils.fromParserErr(???)
-  params <- parseArgs(parseExpr())
-} yield Expr.Call(sym, params)
-
-private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] = for {
-  lParen <- Parser.nextToken.flatMap {
-    case t @ Token.LeftParen => Parser.pure(t)
-    case _                   => Utils.fromParserErr(???)
-  }
-  args <- parseArgsCore(parserOfArg, args)
-  rParen <- Parser.nextToken.flatMap {
-    case t @ Token.RightParen => Parser.pure(t)
-    case _                    => Utils.fromParserErr(???)
-  }
-} yield args
-
-private def parseArgsCore[T](parserOfArg: Parser[T], args: Seq[T]): Parser[Seq[T]] = for {
-  arg <- parserOfArg
-  updatedArgs: Seq[T] = args :+ arg
-  args <- Parser.previewToken.flatMap {
-    case Token.Comma      => Parser.nextToken *> parseArgsCore(parserOfArg, updatedArgs)
-    case Token.RightParen => Parser.pure(updatedArgs)
-    case _                => Utils.fromParserErr(???)
-  }
-} yield args
-
 private def parseIfExpr: Parser[Expr] = for {
   ifToken <- Parser.nextToken.flatMap {
     case t @ Token.If => Parser.pure(t)
@@ -186,6 +132,51 @@ private def parseIfExpr: Parser[Expr] = for {
     case _ => Parser.pure(None)
   }
 } yield Expr.If(cond, consequence, alter)
+
+private def paraseFnLiteral: Parser[Expr] = for {
+  fn <- Parser.nextToken.flatMap {
+    case t @ Token.Function => Parser.pure(t)
+    case _                  => Utils.fromParserErr(???)
+  }
+  args <- parseArgs(Parser.nextToken.flatMap {
+    case t: Token.Ident => Parser.pure(Expr.Ident(t))
+    case _              => Utils.fromParserErr(???)
+  }: Parser[Expr.Ident])
+  body <- parseBlockStatement
+} yield Expr.Fn(args, body)
+
+private def parseCallFnExpr(symbol: Expr): Parser[Expr] = for {
+  sym <- symbol match
+    case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
+    case _                          => Utils.fromParserErr(???)
+  params <- parseArgs(parseExpr())
+} yield Expr.Call(sym, params)
+
+private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] =
+  def go[T](parserOfArg: Parser[T], args: Seq[T]): Parser[Seq[T]] = for {
+    arg <- parserOfArg
+    updatedArgs: Seq[T] = args :+ arg
+    args <- Parser.previewToken.flatMap {
+      case Token.Comma      => Parser.nextToken *> go(parserOfArg, updatedArgs)
+      case Token.RightParen => Parser.pure(updatedArgs)
+      case _                => Utils.fromParserErr(???)
+    }
+  } yield args
+  parseBetweenParen(go(parserOfArg, args))
+
+private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
+
+private def parseBetweenParen[T](parser: Parser[T]): Parser[T] = for {
+  lParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.LeftParen) => Parser.pure(t)
+    case _                              => Utils.fromParserErr(???)
+  }
+  main <- parser
+  rParen <- Parser.nextToken.flatMap {
+    case t if t.equals(Token.RightParen) => Parser.pure(t)
+    case _                               => Utils.fromParserErr(???)
+  }
+} yield main
 
 object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
