@@ -85,18 +85,14 @@ private def parseBlockStatement: Parser[Program] = for {
 } yield program
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
-  def recurInfix(left: Expr): Parser[Expr] = for {
-    previewToken <- Parser.previewToken
+  def recurInfix(left: Expr): Parser[Expr] = Parser.previewToken.flatMap {
+    case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
+      parseInfixExpr(left).flatMap(recurInfix)
+    case _ => Parser.pure(left)
+  }
 
-    expr <- previewToken match
-      case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
-        parseInfixExpr(left).flatMap(recurInfix)
-      case _ => Parser.pure(left)
-
-  } yield expr
   for {
-    token <- Parser.previewToken
-    left <- token match
+    left <- Parser.previewToken.flatMap {
       case Token.Null         => Parser.nextToken.map(_ => Expr.Null)
       case t @ Token.Ident(_) => Parser.nextToken.map(_ => Expr.Ident(t))
       case t @ Token.Int(_)   => Parser.nextToken.map(_ => Expr.Int(t))
@@ -106,6 +102,7 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.LeftParen    => parseGroupExpr
       case Token.Function     => paraseFnLiteral
       case _                  => Utils.fromParserErr(ParserError.NotImplemented)
+    }
     result <- recurInfix(left)
   } yield result
 
