@@ -3,22 +3,111 @@ package parser
 import lexer.Lexer
 import ast.{given, *}
 import token.*
+import cats.implicits.toShow
 
 class ParserTest extends munit.FunSuite {
 
-  // test("let文のテスト") {
-  //   val input = "let x = 5;\nlet y = 10;\nlet foobar = 838382+1;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
+  test("let文のテスト") {
+    val input = "let x = 5;\nlet y = 10;\nlet foobar = 838382+1;"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
 
-  //   if stmts.length != 3 then
-  //     println(s"statementsの要素が3でない: ${stmts.length}")
-  //     assert(false)
+    if stmts.length != 3 then
+      println(s"statementsの要素が3でない: ${stmts.length}")
+      assert(false)
 
-  //   for ((stmt, expected) <- stmts.zip(Seq("let x = 5;", "let y = 10;", "let foobar = (838382 + 1);")))
-  //     assertEquals(stmt.toStr, expected)
+    for ((stmt, expected) <- stmts.zip(Seq("let x = 5;", "let y = 10;", "let foobar = (838382 + 1);")))
+      assertEquals(stmt.show, expected)
 
-  // }
+  }
+
+  test("前置演算子のテスト") {
+    val input = "-15;!5;"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
+
+    if stmts.length != 2 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.Minus, 15), (Token.Bang, 5))
+
+    stmts.zip(expecteds).foreach { (stmt, expected) =>
+      assertEquals(
+        stmt,
+        Statement.Expr {
+          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
+        }
+      )
+    }
+
+  }
+  test("前置演算子のテスト2") {
+    val input = "-15"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
+
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.Minus, 15))
+
+    stmts.zip(expecteds).foreach { (stmt, expected) =>
+      assertEquals(
+        stmt,
+        Statement.Expr {
+          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
+        }
+      )
+    }
+
+  }
+
+  test("中置演算子のテスト") {
+    val input =
+      Seq("5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;").mkString
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
+
+    if stmts.length != 8 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+
+    assert(true)
+    val expecteds: Seq[InfixToken] =
+      Seq(Token.Plus, Token.Minus, Token.Asterisk, Token.Slash, Token.Gt, Token.Lt, Token.Eq, Token.NotEq)
+
+    val iter: Seq[(Statement, InfixToken)] = stmts.zip(expecteds)
+
+    iter.foreach { item =>
+      val stmt = item._1
+      val expected: InfixToken = item._2
+      assertEquals(
+        stmt,
+        Statement.Expr {
+          Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5)))
+        }
+      )
+    }
+
+  }
+
+  test("異なる優先度の演算子が混在するテスト") {
+    for (test <- 異なる優先度の演算子が混在するテストのデータ)
+      val parsed = parseProgram.runA(test._1)
+      val stmt = parsed.getOrElse(Seq()).head
+
+      assertEquals(stmt.show, test._2)
+  }
+
+  test("if式のテスト") {
+    val parsed = parseProgram.runA("if (5 > 3) {let k = 2;return k + 1;} else {let k = 7;return k + 1;}")
+    parsed.getOrElse(Seq()).headOption match
+      case Some(stmt) =>
+        assertEquals(stmt.show, "if ((5 > 3)) {let k = 2;return (k + 1);} else {let k = 7;return (k + 1);}")
+      case None => assert(false)
+  }
 
   // test("let文解析エラーのテスト") {
   //   val input = "let x  5;\nlet  = 10;\nlet 838383;"
@@ -35,118 +124,53 @@ class ParserTest extends munit.FunSuite {
 
   // }
 
-  // test("return文のテスト") {
-  //   val input = "return  5;\nreturn 15+5-10;\nreturn 838383;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
+  test("return文のテスト") {
+    val input = "return  5;\nreturn 15+5-10;\nreturn 838383;"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
 
-  //   if stmts.length != 3 then
-  //     println(s"statementsの要素が3でない: ${stmts.length}")
-  //     assert(false)
+    if stmts.length != 3 then
+      println(s"statementsの要素が3でない: ${stmts.length}")
+      assert(false)
 
-  //   for ((stmt, expected) <- stmts.zip(Seq("return 5;", "return ((15 + 5) - 10);", "return 838383;")))
-  //     assertEquals(stmt.toStr, expected)
+    for ((stmt, expected) <- stmts.zip(Seq("return 5;", "return ((15 + 5) - 10);", "return 838383;")))
+      assertEquals(stmt.show, expected)
 
-  // }
+  }
 
-  // test("識別子のテスト") {
-  //   val input = "foobar;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
+  test("識別子のテスト") {
+    val input = "foobar;"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
 
-  //   if stmts.length != 1 then
-  //     println(s"statementsの要素が1でない: ${stmts.length}")
-  //     assert(false)
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
 
-  //   val stmt = stmts.head
-  //   assert(stmt match
-  //     case Statement.Expr(Expr.Ident(Token.Ident(value))) => value == "foobar"
-  //     case _                                              => false
-  //   )
+    val stmt = stmts.head
+    assert(stmt match
+      case Statement.Expr(Expr.Ident(Token.Ident(value))) => value == "foobar"
+      case _                                              => false
+    )
 
-  // }
+  }
 
-  // test("整数リテラルのテスト") {
-  //   val input = "5;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
+  test("整数リテラルのテスト") {
+    val input = "5;"
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
 
-  //   if stmts.length != 1 then
-  //     println(s"statementsの要素が1でない: ${stmts.length}")
-  //     assert(false)
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
 
-  //   val stmt = stmts.head
-  //   assert(stmt match
-  //     case Statement.Expr(Expr.Int(Token.Int(value))) => value == 5
-  //     case _                                          => false
-  //   )
+    val stmt = stmts.head
+    assert(stmt match
+      case Statement.Expr(Expr.Int(Token.Int(value))) => value == 5
+      case _                                          => false
+    )
 
-  // }
-
-  // test("前置演算子のテスト") {
-  //   val input = "-15;!5;"
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
-
-  //   if stmts.length != 2 then
-  //     println(s"statementsの要素が1でない: ${stmts.length}")
-  //     assert(false)
-
-  //   val expecteds: Seq[(PrefixToken, Int)] = Seq((Token.Minus, 15), (Token.Bang, 5))
-
-  //   stmts.zip(expecteds).foreach { (stmt, expected) =>
-  //     assertEquals(
-  //       stmt,
-  //       Statement.Expr {
-  //         Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
-  //       }
-  //     )
-  //   }
-
-  // }
-
-  // test("中置演算子のテスト") {
-  //   val input =
-  //     Seq("5 + 5;", "5 - 5;", "5 * 5;", "5 / 5;", "5 > 5;", "5 < 5;", "5 == 5;", "5 != 5;").mkString
-  //   val parser = Parser(input)
-  //   val stmts = parser.parseProgram()._2.getOrElse(Seq())
-
-  //   if stmts.length != 8 then
-  //     println(s"statementsの要素が1でない: ${stmts.length}")
-  //     assert(false)
-
-  //   assert(true)
-  //   val expecteds: Seq[InfixToken] =
-  //     Seq(Token.Plus, Token.Minus, Token.Asterisk, Token.Slash, Token.Gt, Token.Lt, Token.Eq, Token.NotEq)
-
-  //   val iter: Seq[(Statement, InfixToken)] = stmts.zip(expecteds)
-
-  //   iter.foreach { item =>
-  //     val stmt = item._1
-  //     val expected: InfixToken = item._2
-  //     assertEquals(
-  //       stmt,
-  //       Statement.Expr {
-  //         Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5)))
-  //       }
-  //     )
-  //   }
-
-  // }
-
-  // test("異なる優先度の演算子が混在するテスト") {
-  //   for (test <- 異なる優先度の演算子が混在するテストのデータ)
-  //     val parser = Parser((test._1))
-  //     val stmt = parser.parseProgram()._2.getOrElse(Seq()).head
-
-  //     assertEquals(stmt.toStr, test._2)
-  // }
-
-  // test("if式のテスト") {
-  //   val parser = Parser(("if (5 > 3) {let k = 2;return k + 1;} else {let k = 7;return k + 1;}"))
-  //   val stmt = parser.parseProgram()._2.getOrElse(Seq()).head
-  //   assertEquals(stmt.toStr, "if ((5 > 3)) {let k = 2;return (k + 1);} else {let k = 7;return (k + 1);}")
-  // }
+  }
 
   // test("関数リテラルのテスト") {
   //   val parser = Parser(("let k = fn(x, y) {x+y}"))
