@@ -29,8 +29,8 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
     if isSemicolon then Evaluator.pure(ConstNull) else evalExpr(expr)
   case Statement.Return(expr) =>
     evalExpr(expr).map {
-      case obj: MonkeyPrimitiveType    => Object.ReturnValue(obj)
-      case obj @ Object.ReturnValue(_) => obj
+      case obj: MonkeyPrimitiveType => Object.ReturnValue(obj)
+      case obj: Object.ReturnValue  => obj
     }
 
   case Statement.Let(ident, expr) =>
@@ -45,10 +45,9 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
-  case expr: Expr.Prefix =>
-    evalPrefixExpr(expr).map((item: Object) => item)
-  case expr: Expr.Infix    => evalInfixExpr(expr).map((item: Object) => item)
-  case expr: Expr.If       => evalIfExpr(expr).map((item: Object) => item)
+  case expr: Expr.Prefix   => evalPrefixExpr(expr)
+  case expr: Expr.Infix    => evalInfixExpr(expr)
+  case expr: Expr.If       => evalIfExpr(expr)
   case Expr.Null           => Evaluator.pure(ConstNull)
   case Expr.Call(fn, args) => evalCallExpr(fn, args)
   case Expr.Ident(t @ Token.Ident(key)) =>
@@ -109,7 +108,7 @@ private def evalCallExpr(
   result <- Evaluator.setEnv(env.concat(localEnv)) *> evalProgram(fnObj.program) <* Evaluator.setEnv(env)
 } yield result
 
-private def evalPrefixExpr(item: Expr.Prefix): Evaluator[MonkeyPrimitiveType] =
+private def evalPrefixExpr(item: Expr.Prefix): Evaluator[Object] =
   val Expr.Prefix(t: PrefixToken, expr) = item
 
   evalExpr(expr).map {
@@ -127,10 +126,10 @@ private def evalPrefixExpr(item: Expr.Prefix): Evaluator[MonkeyPrimitiveType] =
     case Object.ReturnValue(value) => value
   }
 
-private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = for {
+private def evalInfixExpr(item: Expr.Infix): Evaluator[Object] = for {
   expOfL: MonkeyPrimitiveType <- evalExpr(item.left).map(_.unwrap)
   expOfR: MonkeyPrimitiveType <- evalExpr(item.right).map(_.unwrap)
-  result <- (item.token match
+  result <- item.token match
     case t: (Token.Eq.type | Token.NotEq.type) =>
       Evaluator.pure(Object.Boolean {
         t match
@@ -141,7 +140,7 @@ private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = fo
     case t: (Token.Plus.type | Token.Asterisk.type) => evalPlusOrMulOpInfixExpr(t, expOfL, expOfR)
     case t: (Token.Minus.type | Token.Slash.type)   => evalMinusOrModOpInfixExpr(t, expOfL, expOfR)
     case t: (Token.Lt.type | Token.Gt.type)         => evalCompareOpInfixExpr(t, expOfL, expOfR)
-  ): Evaluator[MonkeyPrimitiveType]
+  
 } yield result
 
 private def evalPlusOrMulOpInfixExpr(
