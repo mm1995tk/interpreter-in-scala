@@ -16,11 +16,11 @@ type EitherEvalErrorOr[T] = Either[EvalError, T]
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 
 def evalProgram(program: Program): Evaluator[Object] = program match
-  case Seq() => StateT.pure(ConstNull)
+  case Seq() => Evaluator.pure(ConstNull)
   case h :: tail =>
     tail.foldLeft(evalStatement(h)) { (acc, cur) =>
       acc.flatMap {
-        case Object.ReturnValue(obj) => StateT.pure(obj)
+        case Object.ReturnValue(obj) => Evaluator.pure(obj)
         case _                       => evalStatement(cur)
       }
     }
@@ -44,12 +44,12 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.lift(Right(Object.Int(v)))
   case Expr.Bool(t) =>
-    StateT.pure(Object.Boolean { t.equals(Token.True) })
+    Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix =>
     evalPrefixExpr(expr).map((item: Object) => item)
   case expr: Expr.Infix    => evalInfixExpr(expr).map((item: Object) => item)
   case expr: Expr.If       => evalIfExpr(expr).map((item: Object) => item)
-  case Expr.Null           => StateT.pure(ConstNull)
+  case Expr.Null           => Evaluator.pure(ConstNull)
   case Expr.Call(fn, args) => evalCallExpr(fn, args)
   case Expr.Ident(t @ Token.Ident(key)) =>
     for {
@@ -72,7 +72,7 @@ private def evalCallExpr(
   env <- Evaluator.getEnv
   fnObj <- {
     fn match
-      case Expr.Fn(params, body) => StateT.pure(Object.Function(params.map(_.token), body, env))
+      case Expr.Fn(params, body) => Evaluator.pure(Object.Function(params.map(_.token), body, env))
 
       case Expr.Ident(t @ Token.Ident(key)) =>
         StateT.lift {
@@ -124,7 +124,7 @@ private def evalInfixExpr(item: Expr.Infix): Evaluator[MonkeyPrimitiveType] = fo
   expOfR: MonkeyPrimitiveType <- evalExpr(item.right).map(_.unwrap)
   result <- (item.token match
     case t: (Token.Eq.type | Token.NotEq.type) =>
-      StateT.pure(Object.Boolean {
+      Evaluator.pure(Object.Boolean {
         t match
           case Token.Eq    => expOfL == expOfR
           case Token.NotEq => expOfL != expOfR
@@ -199,7 +199,7 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
 
   evalExpr(item.cond).flatMap {
     case Object.Boolean(bool)      => if bool then consequence else alter
-    case Object.ReturnValue(value) => StateT.pure(value)
+    case Object.ReturnValue(value) => Evaluator.pure(value)
     case Object.Null               => alter
     case Object.Int(value)         => consequence
     case _: Object.Function        => consequence
@@ -208,8 +208,8 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
 private val ConstNull: MonkeyPrimitiveType = Object.Null
 
 private object Evaluator:
-  def pure[T](item: T): Evaluator[T] = Evaluator.pure(item)
-  def pureErr[T](item: EvalError): Evaluator[T] = Evaluator.lift(Left(item))
+  def pure[T](item: T): Evaluator[T] = StateT.pure(item)
+  def pureErr[T](item: EvalError): Evaluator[T] = StateT.lift(Left(item))
   def lift[T] = StateT.lift[EitherEvalErrorOr, Env, T]
   def getEnv = StateT.get[EitherEvalErrorOr, Env]
   def setEnv = StateT.set[EitherEvalErrorOr, Env]
