@@ -11,9 +11,8 @@ import cats.implicits._
 import cats.data.StateT
 import cats.Show
 
-type EitherEvalErrorOr[T] = Either[EvalError, T]
-
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
+type EitherEvalErrorOr[T] = Either[EvalError, T]
 
 def evalProgram(program: Program): Evaluator[Object] = program match
   case Seq() => Evaluator.pure(ConstNull)
@@ -141,7 +140,7 @@ private def evalPlusOrMulOpInfixExpr(
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
 ): Evaluator[MonkeyPrimitiveType] =
-  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
+  val either: EitherEvalErrorOr[MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Int {
         t match
@@ -164,7 +163,7 @@ private def evalMinusOrModOpInfixExpr(
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
 ): Evaluator[MonkeyPrimitiveType] =
-  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
+  val either: EitherEvalErrorOr[MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Int {
         t match
@@ -179,7 +178,7 @@ private def evalCompareOpInfixExpr(
     a: MonkeyPrimitiveType,
     b: MonkeyPrimitiveType
 ): Evaluator[MonkeyPrimitiveType] =
-  val either: Either[EvalError, MonkeyPrimitiveType] = (a, b) match
+  val either: EitherEvalErrorOr[MonkeyPrimitiveType] = (a, b) match
     case (Object.Int(l), Object.Int(r)) =>
       Right(Object.Boolean {
         t match
