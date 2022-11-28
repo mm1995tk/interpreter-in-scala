@@ -2,13 +2,14 @@ package parser
 
 import ast.*
 import lexer.*
-import token.*
+import token.{*, given}
 import cats.data.{StateT, State}
 import cats.Show
 import cats.implicits.*
+import cats.kernel.Order
 
-type EitherParserErrorOr[T] = Either[ParserError, T]
 type Parser[T] = StateT[EitherParserErrorOr, String, T]
+type EitherParserErrorOr[T] = Either[ParserError, T]
 
 def parseProgram: Parser[Program] = parse()
 
@@ -16,10 +17,10 @@ private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser
   for {
     stmt <- parseStatement
     appended = program :+ stmt
-    previewToken <- Parser.previewToken
-    program <-
-      if previewToken.equals(endToken) then Parser.pure(appended)
-      else parse(appended, endToken)
+    program <- Parser.previewToken.flatMap {
+      case t if t.equals(endToken) => Parser.pure(appended)
+      case _                       => parse(appended, endToken)
+    }
   } yield program
 
 private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
@@ -31,32 +32,32 @@ private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
 private def parseLetStatement: Parser[Statement] = for {
   let <- Parser.nextToken.flatMap {
     case t @ Token.Let => Parser.pure(t)
-    case _             => Utils.fromParserErr(???)
+    case _             => Parser.pureErr(???)
   }
   ident <- Parser.nextToken.flatMap {
     case t: Token.Ident => Parser.pure(t)
-    case _              => Utils.fromParserErr(???)
+    case _              => Parser.pureErr(???)
   }
   assign <- Parser.nextToken.flatMap {
     case t @ Token.Assign => Parser.pure(t)
-    case _                => Utils.fromParserErr(???)
+    case _                => Parser.pureErr(???)
   }
   expr <- parseExpr()
   semicolon <- Parser.nextToken.flatMap {
     case t @ Token.Semicolon => Parser.pure(t)
-    case _                   => Utils.fromParserErr(???)
+    case _                   => Parser.pureErr(???)
   }
 } yield Statement.Let(ident, expr)
 
 private def parseReturnStatement: Parser[Statement] = for {
-  returnStmt <- Parser.nextToken.flatMap {
+  returnToken <- Parser.nextToken.flatMap {
     case t @ Token.Return => Parser.pure(t)
-    case _                => Utils.fromParserErr(???)
+    case _                => Parser.pureErr(???)
   }
   expr <- parseExpr()
   semicolon <- Parser.nextToken.flatMap {
     case t @ Token.Semicolon => Parser.pure(t)
-    case _                   => Utils.fromParserErr(???)
+    case _                   => Parser.pureErr(???)
   }
 } yield Statement.Return(expr)
 
@@ -71,23 +72,16 @@ private def parseExprStatement: Parser[Statement] = for {
 private def parseBlockStatement: Parser[Program] = for {
   lBrace <- Parser.nextToken.flatMap {
     case t @ Token.LeftBrace => Parser.pure(t)
-    case _                   => Utils.fromParserErr(???)
+    case _                   => Parser.pureErr(???)
   }
   program <- parse(Seq(), Token.RightBrace)
   rBrace <- Parser.nextToken.flatMap {
     case t @ Token.RightBrace => Parser.pure(t)
-    case _                    => Utils.fromParserErr(???)
+    case _                    => Parser.pureErr(???)
   }
 } yield program
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
-  def recurInfix(left: Expr): Parser[Expr] = Parser.previewToken.flatMap {
-    case Token.LeftParen => parseCallFnExpr(left)
-    case infix: InfixToken if precedence < getInfixPrecedence(infix) =>
-      parseInfixExpr(left).flatMap(recurInfix)
-    case _ => Parser.pure(left)
-  }
-
   for {
     left <- Parser.previewToken.flatMap {
       case Token.Null         => Parser.nextToken.map(_ => Expr.Null)
@@ -98,28 +92,36 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.If           => parseIfExpr
       case Token.LeftParen    => parseGroupExpr
       case Token.Function     => paraseFnLiteral
-      case _                  => Utils.fromParserErr(ParserError.NotImplemented)
+      case _                  => Parser.pureErr(ParserError.NotImplemented)
     }
-    result <- recurInfix(left)
+    result <- Parser.previewToken.flatMap {
+      case Token.LeftParen   => parseCallFnExpr(left)
+      case infix: InfixToken => parseInfixExpr(left, precedence)
+      case _                 => Parser.pure(left)
+    }
   } yield result
 
 private def parsePrefixExpr: Parser[Expr] = for {
   prefixToken: PrefixToken <- Parser.nextToken.flatMap {
     case t: PrefixToken => Parser.pure(t)
-    case _              => Utils.fromParserErr(???)
+    case _              => Parser.pureErr(???)
   }
   expr <- parseExpr(Precedence.Prefix)
 } yield Expr.Prefix(prefixToken, expr)
 
-private def parseInfixExpr(left: Expr): Parser[Expr] = Parser.nextToken.flatMap {
-  case t: InfixToken => parseExpr(getInfixPrecedence(t)).map(Expr.Infix(t, left, _))
-  case _             => Utils.fromParserErr(???)
+private def parseInfixExpr(left: Expr, precedence: Precedence): Parser[Expr] = Parser.previewToken.flatMap {
+  case t: InfixToken if precedence < getInfixPrecedence(t) =>
+    for {
+      right <- Parser.nextToken *> parseExpr(getInfixPrecedence(t))
+      result <- parseInfixExpr(Expr.Infix(t, left, right), precedence)
+    } yield result
+  case _ => Parser.pure(left)
 }
 
 private def parseIfExpr: Parser[Expr] = for {
   ifToken <- Parser.nextToken.flatMap {
     case t @ Token.If => Parser.pure(t)
-    case _            => Utils.fromParserErr(???)
+    case _            => Parser.pureErr(???)
   }
   cond <- parseGroupExpr
   consequence <- parseBlockStatement
@@ -136,11 +138,11 @@ private def parseIfExpr: Parser[Expr] = for {
 private def paraseFnLiteral: Parser[Expr] = for {
   fn <- Parser.nextToken.flatMap {
     case t @ Token.Function => Parser.pure(t)
-    case _                  => Utils.fromParserErr(???)
+    case _                  => Parser.pureErr(???)
   }
   args <- parseArgs(Parser.nextToken.flatMap {
     case t: Token.Ident => Parser.pure(Expr.Ident(t))
-    case _              => Utils.fromParserErr(???)
+    case _              => Parser.pureErr(???)
   }: Parser[Expr.Ident])
   body <- parseBlockStatement
 } yield Expr.Fn(args, body)
@@ -148,7 +150,7 @@ private def paraseFnLiteral: Parser[Expr] = for {
 private def parseCallFnExpr(symbol: Expr): Parser[Expr] = for {
   sym <- symbol match
     case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
-    case _                          => Utils.fromParserErr(???)
+    case _                          => Parser.pureErr(???)
   params <- parseArgs(parseExpr())
 } yield Expr.Call(sym, params)
 
@@ -159,9 +161,10 @@ private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[S
     args <- Parser.previewToken.flatMap {
       case Token.Comma      => Parser.nextToken *> go(parserOfArg, updatedArgs)
       case Token.RightParen => Parser.pure(updatedArgs)
-      case _                => Utils.fromParserErr(???)
+      case _                => Parser.pureErr(???)
     }
   } yield args
+  end go
   parseBetweenParen(go(parserOfArg, args))
 
 private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
@@ -169,17 +172,19 @@ private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
 private def parseBetweenParen[T](parser: Parser[T]): Parser[T] = for {
   lParen <- Parser.nextToken.flatMap {
     case t if t.equals(Token.LeftParen) => Parser.pure(t)
-    case _                              => Utils.fromParserErr(???)
+    case _                              => Parser.pureErr(???)
   }
   main <- parser
   rParen <- Parser.nextToken.flatMap {
     case t if t.equals(Token.RightParen) => Parser.pure(t)
-    case _                               => Utils.fromParserErr(???)
+    case _                               => Parser.pureErr(???)
   }
 } yield main
 
 private object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
+
+  def pureErr[T](err: ParserError): Parser[T] = StateT.lift[EitherParserErrorOr, String, T](Left(err))
 
   def nextToken: Parser[Token] =
     StateT.fromState[EitherParserErrorOr, String, Token](lexer.tokenize.map(Right(_)))
@@ -190,10 +195,6 @@ private object Parser:
     _ <- StateT.set(str)
   } yield token
 
-private object Utils:
-  def fromParserErr[T](err: ParserError) = Utils.liftParser[T](Left(err))
-  def liftParser[T] = StateT.lift[EitherParserErrorOr, String, T]
-
 enum ParserError:
   case NotImplemented
   case UnexpectedToken(obtained: Token, expexted: Token)
@@ -202,20 +203,20 @@ given Show[ParserError] with
   def show(t: ParserError): String = t match
     case ParserError.NotImplemented => "not impl"
     case ParserError.UnexpectedToken(obtained, expected) =>
-      s"expected token is \"${expected.showLiteral}\", but obatained is \"${obtained.showLiteral}\""
+      s"expected token is \"${expected.show}\", but obatained is \"${obtained.show}\""
 
 private enum Precedence:
-  def <(target: Precedence) = this.ordinal < target.ordinal
-  def >(target: Precedence) = this.ordinal > target.ordinal
   case Lowest, Equals, LessOrGreater, Sum, Product, Prefix, Call
 
-private def getInfixPrecedence(token: InfixToken | Token.LeftParen.type): Precedence = token match
-  case Token.Plus      => Precedence.Sum
-  case Token.Minus     => Precedence.Sum
-  case Token.Asterisk  => Precedence.Product
-  case Token.Slash     => Precedence.Product
-  case Token.Lt        => Precedence.LessOrGreater
-  case Token.Gt        => Precedence.LessOrGreater
-  case Token.Eq        => Precedence.Equals
-  case Token.NotEq     => Precedence.Equals
-  case Token.LeftParen => Precedence.Call
+given Order[Precedence] with
+  def compare(x: Precedence, y: Precedence): Int = x.ordinal - y.ordinal
+
+private def getInfixPrecedence(token: InfixToken): Precedence = token match
+  case Token.Plus     => Precedence.Sum
+  case Token.Minus    => Precedence.Sum
+  case Token.Asterisk => Precedence.Product
+  case Token.Slash    => Precedence.Product
+  case Token.Lt       => Precedence.LessOrGreater
+  case Token.Gt       => Precedence.LessOrGreater
+  case Token.Eq       => Precedence.Equals
+  case Token.NotEq    => Precedence.Equals

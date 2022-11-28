@@ -1,6 +1,6 @@
 package ast
 
-import token.*
+import token.{*, given}
 import cats.Show
 import cats.given
 import cats.implicits.*
@@ -28,20 +28,20 @@ given Show[Program] with
 
 given Show[Statement] with
   def show(expr: Statement): String = expr match
-    case Statement.Let(ident, expr) => s"let ${ident.showLiteral} = ${expr.show};"
+    case Statement.Let(ident, expr) => s"let ${ident.asInstanceOf[Token].show} = ${expr.show};"
     case Statement.Return(expr)     => s"return ${expr.show};"
     case Statement.Expr(expr)       => expr.show
 
 given Show[Expr] with
   def show(t: Expr): String = t match
     case Expr.Null               => "null"
-    case Expr.Ident(ident)       => ident.showLiteral
-    case Expr.Int(ident)         => ident.showLiteral
-    case Expr.Prefix(ident, r)   => s"(${ident.showLiteral}${r.show})"
-    case Expr.Infix(ident, l, r) => s"(${l.show} ${ident.showLiteral} ${r.show})"
+    case Expr.Ident(ident)       => ident.asInstanceOf[Token].show
+    case Expr.Int(ident)         => ident.asInstanceOf[Token].show
+    case Expr.Prefix(ident, r)   => s"(${ident.asInstanceOf[Token].show}${r.show})"
+    case Expr.Infix(ident, l, r) => s"(${l.show} ${ident.asInstanceOf[Token].show} ${r.show})"
     case Expr.Bool(token)        => token.equals(Token.True).toString()
     case Expr.Fn(params, body) =>
-      s"${Token.Function.showLiteral}(${params.map(_._1.showLiteral).mkString(", ")}) {${body.show}}"
+      s"${Token.Function.show}(${params.map(_._1.asInstanceOf[Token].show).mkString(", ")}) {${body.show}}"
     case Expr.If(cond, conseq, alter) =>
       s"if (${cond.show}) {${conseq.show}} ${alter match
           case Some(v) => s"else {${v.show}}"

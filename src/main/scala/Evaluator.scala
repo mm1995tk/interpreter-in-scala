@@ -5,7 +5,7 @@ import obj.*
 import ast.{Statement, Expr}
 import token.{Token, InfixToken, PrefixToken}
 import parser.{ParserError}
-import token.showLiteral
+import token.given
 import env.Env
 import cats.implicits._
 import cats.data.StateT
@@ -221,9 +221,10 @@ enum EvalError:
 given Show[EvalError] with
   def show(t: EvalError): String = t match
     case EvalError.TypeMismatch(l, r, op) =>
-      s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.showLiteral}."
+      s"typemismatch: can't calculate ${l.getType} and ${r.getType} by ${op.asInstanceOf[Token].show}."
     case EvalError.UncaughtReferenceError(Token.Ident(key)) =>
       s"uncaught referenceError: $key is not defined"
-    case EvalError.UnknownOperator(op, value) => s"unknown operator: ${op.showLiteral}${value.getType}"
+    case EvalError.UnknownOperator(op, value) =>
+      s"unknown operator: ${op.asInstanceOf[Token].show}${value.getType}"
     case EvalError.CountOfArgsMismatch(obtained, expected) =>
       s"expected count of args is $expected, but got $obtained"

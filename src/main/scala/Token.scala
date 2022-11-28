@@ -1,5 +1,7 @@
 package token
 
+import cats.Show
+
 enum Token:
   case Illegal,
     Eof,
@@ -38,8 +40,8 @@ type InfixToken =
 
 type BoolToken = Token.True.type | Token.False.type
 
-extension (token: Token)
-  def showLiteral: String = token match
+given Show[Token] with
+  def show(token: Token): String = token match
     case Token.Null                 => "null"
     case Token.Illegal              => 0.toChar.toString()
     case Token.Eof                  => 0.toChar.toString()
