@@ -6,9 +6,9 @@ let add = fn(x, y) {
 };
 
 let twice = fn(f) {
-  fn (x) {
+  return fn (x) {
     f(f(x))
-  }
+  };
 };
 
 let addTwo = fn(x) {

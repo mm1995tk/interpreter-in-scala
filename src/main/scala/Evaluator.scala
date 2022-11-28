@@ -1,7 +1,7 @@
 package evaluator
 
-import ast.*
-import obj.*
+import ast.{*, given}
+import obj.{*, given}
 import ast.{Statement, Expr}
 import token.{Token, InfixToken, PrefixToken}
 import parser.{ParserError}
@@ -83,8 +83,9 @@ private def evalCallExpr(
 
       case Expr.Call(fn, params) =>
         evalCallExpr(fn, params).flatMap {
-          case obj: Object.Function => Evaluator.pure(obj)
-          case _                    => Evaluator.pureErr(???)
+          case obj: Object.Function                     => Evaluator.pure(obj)
+          case Object.ReturnValue(obj: Object.Function) => Evaluator.pure(obj)
+          case _                                        => Evaluator.pureErr(???)
         }
 
   }: Evaluator[Object.Function]
