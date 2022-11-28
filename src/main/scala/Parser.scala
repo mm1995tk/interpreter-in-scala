@@ -94,15 +94,15 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.Function     => paraseFnLiteral
       case _                  => Parser.pureErr(ParserError.NotImplemented)
     }
-    result <- parseRight(left, precedence)
-  } yield result
+    expr <- parseFoldExprFromLeft(left, precedence)
+  } yield expr
 
-private def parseRight(left: Expr, precedence: Precedence): Parser[Expr] =
+private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Expr] =
   Parser.previewToken.flatMap {
     case t: InfixToken if precedence < getInfixPrecedence(t) =>
       for {
         right <- Parser.nextToken *> parseExpr(getInfixPrecedence(t))
-        result <- parseRight(Expr.Infix(t, left, right), precedence)
+        result <- parseFoldExprFromLeft(Expr.Infix(t, left, right), precedence)
       } yield result
     case Token.LeftParen =>
       for {
@@ -111,7 +111,7 @@ private def parseRight(left: Expr, precedence: Precedence): Parser[Expr] =
           case _                                      => Parser.pureErr(ParserError.NotImplemented)
         params <- parseArgs(parseExpr())
         expr = Expr.Call(sym, params)
-        result <- parseRight(expr, precedence)
+        result <- parseFoldExprFromLeft(expr, precedence)
       } yield result
     case _ => Parser.pure(left)
   }
