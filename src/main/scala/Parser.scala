@@ -149,10 +149,15 @@ private def paraseFnLiteral: Parser[Expr] = for {
 
 private def parseCallFnExpr(symbol: Expr): Parser[Expr] = for {
   sym <- symbol match
-    case fn: (Expr.Fn | Expr.Ident) => Parser.pure(fn)
-    case _                          => Parser.pureErr(???)
+    case fn: (Expr.Fn | Expr.Ident | Expr.Call) => Parser.pure(fn)
+    case _                                      => Parser.pureErr(ParserError.NotImplemented)
   params <- parseArgs(parseExpr())
-} yield Expr.Call(sym, params)
+  expr = Expr.Call(sym, params)
+  result <- Parser.previewToken.flatMap {
+    case Token.LeftParen => parseCallFnExpr(expr)
+    case _               => Parser.pure(expr)
+  }
+} yield result
 
 private def parseArgs[T](parserOfArg: Parser[T], args: Seq[T] = Seq()): Parser[Seq[T]] =
   def go[T](parserOfArg: Parser[T], args: Seq[T]): Parser[Seq[T]] = for {

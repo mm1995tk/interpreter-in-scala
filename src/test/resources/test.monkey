@@ -15,9 +15,7 @@ let addTwo = fn(x) {
   return x + 2;
 };
 
-let g = twice(addTwo);
-
-let result = g(five);
+let result = twice(addTwo)(five);
 
 if (result > 7) {
   return result;

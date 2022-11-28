@@ -65,7 +65,7 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
     Evaluator.getEnv.map { Object.Function(params.map(_.token), body, _) }
 
 private def evalCallExpr(
-    fn: Expr.Ident | Expr.Fn,
+    fn: Expr.Ident | Expr.Fn | Expr.Call,
     args: Seq[Expr]
 ): Evaluator[Object] = for {
   env <- Evaluator.getEnv
@@ -80,6 +80,13 @@ private def evalCallExpr(
             case _                    => Left(???) // 関数以外のエラー
           }
         }
+
+      case Expr.Call(fn, params) =>
+        evalCallExpr(fn, params).flatMap {
+          case obj: Object.Function => Evaluator.pure(obj)
+          case _                    => Evaluator.pureErr(???)
+        }
+
   }: Evaluator[Object.Function]
 
   evaluatedArgs: Seq[(String, MonkeyPrimitiveType)] <-
