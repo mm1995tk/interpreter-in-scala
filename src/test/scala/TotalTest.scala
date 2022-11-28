@@ -7,9 +7,8 @@ import parser.ParserError
 import evaluator.EvalError
 
 class TotalTest extends munit.FunSuite {
-
-  test("ソースコード") {
-    val source = scala.io.Source.fromResource("test.monkey").getLines.mkString
+  test("高階関数") {
+    val source = scala.io.Source.fromResource("higher_order_function.monkey").getLines.mkString
     val env = Env()
 
     val eitherErrOrResult = for {
@@ -18,12 +17,62 @@ class TotalTest extends munit.FunSuite {
     } yield result
 
     eitherErrOrResult match
-      case Left(value) =>
-        print(value)
+      case Left(value: ParserError) =>
+        println("ParserError")
+        println(value)
+        assert(false)
+      case Left(value: EvalError) =>
+        println("EvalError")
+        println(value)
         assert(false)
       case Right(value) =>
         assertEquals(value.unwrap.getValue, Some(9))
-
+      case _ => assert(false)
   }
 
+  test("フィボナッチ") {
+    val source = scala.io.Source.fromResource("fibonacci.monkey").getLines.mkString
+    val env = Env()
+
+    val eitherErrOrResult = for {
+      program <- parseProgram.runA(source)
+      result <- evalProgram(program).runA(env)
+    } yield result
+
+    eitherErrOrResult match
+      case Left(value: ParserError) =>
+        println("ParserError")
+        println(value)
+        assert(false)
+      case Left(value: EvalError) =>
+        println("EvalError")
+        println(value)
+        assert(false)
+      case Right(value) =>
+        assertEquals(value.unwrap.getValue, Some(5))
+      case _ => assert(false)
+  }
+
+  test("文は値を返さない") {
+    val source = scala.io.Source.fromResource("stmt.monkey").getLines.mkString
+    val env = Env()
+
+    val eitherErrOrResult = for {
+      program <- parseProgram.runA(source)
+      result <- evalProgram(program).runA(env)
+    } yield result
+
+    eitherErrOrResult match
+      case Left(value: ParserError) =>
+        println("ParserError")
+        println(value)
+        assert(false)
+      case Left(value: EvalError) =>
+        println("EvalError")
+        println(value)
+        assert(false)
+      case Right(value) =>
+        assertEquals(value, Object.Null)
+      case _ => assert(false)
+  }
 }
