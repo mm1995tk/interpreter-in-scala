@@ -25,7 +25,8 @@ def evalProgram(program: Program): Evaluator[Object] = program match
     }
 
 private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
-  case Statement.Expr(expr) => evalExpr(expr)
+  case Statement.Expr(expr, isSemicolon) =>
+    if isSemicolon then Evaluator.pure(ConstNull) else evalExpr(expr)
   case Statement.Return(expr) =>
     evalExpr(expr).map {
       case obj: MonkeyPrimitiveType    => Object.ReturnValue(obj)

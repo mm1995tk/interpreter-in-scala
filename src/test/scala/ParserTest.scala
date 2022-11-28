@@ -35,9 +35,9 @@ class ParserTest extends munit.FunSuite {
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
         stmt,
-        Statement.Expr {
-          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
-        }
+        Statement.Expr (
+          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))), true
+        )
       )
     }
 
@@ -56,9 +56,7 @@ class ParserTest extends munit.FunSuite {
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
         stmt,
-        Statement.Expr {
-          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2)))
-        }
+        Statement.Expr (Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))), false)
       )
     }
 
@@ -85,9 +83,7 @@ class ParserTest extends munit.FunSuite {
       val expected: InfixToken = item._2
       assertEquals(
         stmt,
-        Statement.Expr {
-          Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5)))
-        }
+        Statement.Expr (Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5))), true)
       )
     }
 
@@ -134,14 +130,14 @@ class ParserTest extends munit.FunSuite {
 
     val stmt = stmts.head
     assert(stmt match
-      case Statement.Expr(Expr.Ident(Token.Ident(value))) => value == "foobar"
+      case Statement.Expr(Expr.Ident(Token.Ident(value)), _) => value == "foobar"
       case _                                              => false
     )
 
   }
 
   test("整数リテラルのテスト") {
-    val input = "5;"
+    val input = "5"
     val parsed = parseProgram.runA(input)
     val stmts = parsed.getOrElse(Seq())
 
@@ -151,7 +147,7 @@ class ParserTest extends munit.FunSuite {
 
     val stmt = stmts.head
     assert(stmt match
-      case Statement.Expr(Expr.Int(Token.Int(value))) => value == 5
+      case Statement.Expr(Expr.Int(Token.Int(value)), _) => value == 5
       case _                                          => false
     )
 

@@ -10,7 +10,7 @@ type Program = Seq[Statement]
 enum Statement:
   case Let(ident: Token.Ident, expr: ast.Expr)
   case Return(expr: ast.Expr)
-  case Expr(expr: ast.Expr)
+  case Expr(expr: ast.Expr, semicolon: Boolean)
 
 enum Expr:
   case Null
@@ -30,7 +30,7 @@ given Show[Statement] with
   def show(expr: Statement): String = expr match
     case Statement.Let(ident, expr) => s"let ${ident.asInstanceOf[Token].show} = ${expr.show};"
     case Statement.Return(expr)     => s"return ${expr.show};"
-    case Statement.Expr(expr)       => expr.show
+    case Statement.Expr(expr, bool) => s"${expr.show}${if bool then ";" else ""}"
 
 given Show[Expr] with
   def show(t: Expr): String = t match

@@ -56,10 +56,10 @@ class EvaluatorTest extends munit.FunSuite {
 
   test("let文の評価") {
     val list: List[(String, scala.Int)] = List(
-      ("let a = 5; a;", 5),
+      ("let a = 5; a", 5),
       ("let a = 5 * 5; a", 25),
       ("let a = 5; let b = a; b", 5),
-      ("let a = 5; let b = a; let c= a+ b+ 5; c;", 15),
+      ("let a = 5; let b = a; let c= a+ b+ 5; c", 15),
       ("let a = 3; let b = if (a > 1){ if (a > 2) {return a * 2;} return 4;};  b + 1 ", 7)
     )
 

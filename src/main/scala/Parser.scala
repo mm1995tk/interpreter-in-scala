@@ -67,7 +67,7 @@ private def parseExprStatement: Parser[Statement] = for {
     case Token.Semicolon => Parser.nextToken.map(Some.apply)
     case _               => Parser.pure(None)
   }
-} yield Statement.Expr(expr)
+} yield Statement.Expr(expr, !optionalSemicolon.isEmpty)
 
 private def parseBlockStatement: Parser[Program] = for {
   lBrace <- Parser.nextToken.flatMap {
