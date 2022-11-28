@@ -42,7 +42,7 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
     } yield ConstNull
 
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
-  case Expr.Int(Token.Int(v)) => Evaluator.lift(Right(Object.Int(v)))
+  case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix =>
@@ -59,7 +59,7 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
           case Some(Object.ReturnValue(obj))  => Right(obj)
           case None                           => Left(EvalError.UncaughtReferenceError(t))
       }
-      obj <- StateT.lift(eitherObjOrErr)
+      obj <- Evaluator.lift(eitherObjOrErr)
     } yield obj
 
   case Expr.Fn(params, body) =>
@@ -75,7 +75,7 @@ private def evalCallExpr(
       case Expr.Fn(params, body) => Evaluator.pure(Object.Function(params.map(_.token), body, env))
 
       case Expr.Ident(t @ Token.Ident(key)) =>
-        StateT.lift {
+        Evaluator.lift {
           env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
             case obj: Object.Function => Right(obj)
             case _                    => Left(???) // 関数以外のエラー
@@ -90,8 +90,8 @@ private def evalCallExpr(
         .sequence
         .map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1.unwrap)))
     else
-      Evaluator.lift {
-        Left(EvalError.CountOfArgsMismatch(args.length, fnObj.params.length))
+      Evaluator.pureErr {
+        EvalError.CountOfArgsMismatch(args.length, fnObj.params.length)
       }
 
   localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
@@ -115,7 +115,7 @@ private def evalPrefixExpr(item: Expr.Prefix): Evaluator[MonkeyPrimitiveType] =
         case Token.Bang  => Object.Boolean(!b)
     case Object.Null => Object.Boolean(true)
     case obj: Object.Function =>
-      return StateT.lift(Left(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType)))
+      return Evaluator.pureErr(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType))
     case Object.ReturnValue(value) => value
   }
 
@@ -157,7 +157,7 @@ private def evalPlusOrMulOpInfixExpr(
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
 
-  StateT.lift(either)
+  Evaluator.lift(either)
 
 private def evalMinusOrModOpInfixExpr(
     t: (Token.Minus.type | Token.Slash.type),
@@ -172,7 +172,7 @@ private def evalMinusOrModOpInfixExpr(
           case Token.Slash => l / r
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
-  StateT.lift(either)
+  Evaluator.lift(either)
 
 private def evalCompareOpInfixExpr(
     t: (Token.Lt.type | Token.Gt.type),
@@ -187,7 +187,7 @@ private def evalCompareOpInfixExpr(
           case Token.Gt => l > r
       })
     case (l: MonkeyPrimitiveType, r: MonkeyPrimitiveType) => Left(EvalError.TypeMismatch(l, r, t))
-  StateT.lift(either)
+  Evaluator.lift(either)
 
 private def evalIfExpr(item: Expr.If): Evaluator[Object] =
 
@@ -195,7 +195,7 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
   lazy val alter: Evaluator[Object] =
     item.alter match
       case Some(alter) => evalProgram(alter)
-      case None        => Evaluator.lift(Right(ConstNull))
+      case None        => Evaluator.pure(ConstNull)
 
   evalExpr(item.cond).flatMap {
     case Object.Boolean(bool)      => if bool then consequence else alter
