@@ -26,7 +26,14 @@ def evalProgram(program: Program): Evaluator[Object] = program match
 
 private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
   case Statement.Expr(expr, isSemicolon) =>
-    if isSemicolon then Evaluator.pure(ConstNull) else evalExpr(expr)
+    val stmtExpr = evalExpr(expr)
+    if isSemicolon then
+      stmtExpr.map {
+        case obj: Object.ReturnValue => obj
+        case other                   => ConstNull
+      }
+    else stmtExpr
+
   case Statement.Return(expr) =>
     evalExpr(expr).map {
       case obj: MonkeyPrimitiveType => Object.ReturnValue(obj)

@@ -3,6 +3,9 @@ import env.Env
 import evaluator.evalProgram
 import obj.{getValue, Object, MonkeyPrimitiveType}
 import cats.implicits.toShow
+import parser.ParserError
+import evaluator.EvalError
+import ast.given
 
 class EvaluatorTest extends munit.FunSuite {
   test("数値の評価") {
@@ -38,6 +41,32 @@ class EvaluatorTest extends munit.FunSuite {
       case Right(obj) => assertEquals(obj.unwrap.getValue, Some(3))
       case _          => assert(false)
 
+  }
+
+  test("if式の評価") {
+    val input1 = "if (true) {if (true) {return 10;};return 1;}"
+    val input2 = "if (true) {if (true) {return 10;} return 1;}"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input1)
+      parsed2 <- parseProgram.runA(input2)
+
+      evaluated <- evalProgram(parsed).runA(Env())
+      evaluated2 <- evalProgram(parsed2).runA(Env())
+    } yield (evaluated, evaluated2)
+
+    eitherResultOrErr match
+      case Right((obj1, obj2)) =>
+        assertEquals(obj1.unwrap.getValue, Some(10))
+        assertEquals(obj1, obj2)
+      case Left(value: ParserError) =>
+        println("ParserError")
+        println(value)
+        assert(false)
+      case Left(value: EvalError) =>
+        println("EvalError")
+        println(value)
+        assert(false)
+      case _ => assert(false)
   }
 
   test("高階関数の評価") {
