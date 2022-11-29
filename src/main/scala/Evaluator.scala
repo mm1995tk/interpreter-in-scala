@@ -140,7 +140,7 @@ private def evalInfixExpr(item: Expr.Infix): Evaluator[Object] = for {
     case t: (Token.Plus.type | Token.Asterisk.type) => evalPlusOrMulOpInfixExpr(t, expOfL, expOfR)
     case t: (Token.Minus.type | Token.Slash.type)   => evalMinusOrModOpInfixExpr(t, expOfL, expOfR)
     case t: (Token.Lt.type | Token.Gt.type)         => evalCompareOpInfixExpr(t, expOfL, expOfR)
-  
+
 } yield result
 
 private def evalPlusOrMulOpInfixExpr(
@@ -197,20 +197,21 @@ private def evalCompareOpInfixExpr(
   Evaluator.lift(either)
 
 private def evalIfExpr(item: Expr.If): Evaluator[Object] =
-
   lazy val consequence: Evaluator[Object] = evalProgram(item.consequence)
   lazy val alter: Evaluator[Object] =
     item.alter match
       case Some(alter) => evalProgram(alter)
       case None        => Evaluator.pure(ConstNull)
 
-  evalExpr(item.cond).flatMap {
+  def go(item: Evaluator[Object]): Evaluator[Object] = item.flatMap {
+    case Object.ReturnValue(value) => go(Evaluator.pure(value))
     case Object.Boolean(bool)      => if bool then consequence else alter
-    case Object.ReturnValue(value) => Evaluator.pure(value)
     case Object.Null               => alter
     case Object.Int(value)         => consequence
     case _: Object.Function        => consequence
   }
+
+  go(evalExpr(item.cond))
 
 private val ConstNull: MonkeyPrimitiveType = Object.Null
 
