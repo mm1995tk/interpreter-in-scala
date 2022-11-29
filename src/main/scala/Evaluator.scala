@@ -19,7 +19,7 @@ def evalProgram(program: Program): Evaluator[Object] = program match
   case h :: tail =>
     tail.foldLeft(evalStatement(h)) { (acc, cur) =>
       acc.flatMap {
-        case Object.ReturnValue(obj) => Evaluator.pure(obj)
+        case obj: Object.ReturnValue => Evaluator.pure(obj)
         case _                       => evalStatement(cur)
       }
     }
