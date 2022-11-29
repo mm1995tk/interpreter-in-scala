@@ -60,7 +60,6 @@ class TotalTest extends munit.FunSuite {
 
     val eitherErrOrResult = for {
       program <- parseProgram.runA(source)
-      _ = println(program.show)
       result <- evalProgram(program).runA(env)
     } yield result
 
