@@ -84,10 +84,10 @@ private def parseBlockStatement: Parser[Program] = for {
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
   for {
     left <- Parser.previewToken.flatMap {
-      case Token.Null         => Parser.nextToken.map(_ => Expr.Null)
-      case t @ Token.Ident(_) => Parser.nextToken.map(_ => Expr.Ident(t))
-      case t @ Token.Int(_)   => Parser.nextToken.map(_ => Expr.Int(t))
-      case t: BoolToken       => Parser.nextToken.map(_ => Expr.Bool(t))
+      case Token.Null         => Parser.nextToken.as(Expr.Null)
+      case t @ Token.Ident(_) => Parser.nextToken.as(Expr.Ident(t))
+      case t @ Token.Int(_)   => Parser.nextToken.as(Expr.Int(t))
+      case t: BoolToken       => Parser.nextToken.as(Expr.Bool(t))
       case t: PrefixToken     => parsePrefixExpr
       case Token.If           => parseIfExpr
       case Token.LeftParen    => parseGroupExpr
