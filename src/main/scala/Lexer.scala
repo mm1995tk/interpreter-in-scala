@@ -22,11 +22,11 @@ private def twoCharLexer(char0: Char): Lexer = for {
   token <- char0 match
     case '=' =>
       if char1 == '=' then State.pure(Token.Eq)
-      else State.set(state0).map(_ => Token.Assign)
+      else State.set(state0).as(Token.Assign)
 
     case '!' =>
       if char1 == '=' then State.pure(Token.NotEq)
-      else State.set(state0).map(_ => Token.Bang)
+      else State.set(state0).as(Token.Bang)
 } yield token
 
 private def stringLexer(str: String = ""): Lexer = getChar.flatMap {
