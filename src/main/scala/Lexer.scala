@@ -2,6 +2,7 @@ package lexer
 
 import token.Token
 import cats.data.State
+import cats.implicits.*
 
 type Lexer = State[String, Token]
 
@@ -38,7 +39,7 @@ private def numberLexer(n: String): Lexer = for {
   char1 <- getChar
   token <-
     if char1.isDigit then numberLexer(s"${n}${char1}")
-    else State.set(state0).map(_ => Token.Int(n.toInt))
+    else State.set(state0).as(Token.Int(n.toInt))
 } yield token
 
 private def identifierLexer(str: String): Lexer = for {
@@ -49,7 +50,7 @@ private def identifierLexer(str: String): Lexer = for {
     else
       State
         .set(state0)
-        .map(_ =>
+        .as {
           str match
             case "let"    => Token.Let
             case "return" => Token.Return
@@ -60,17 +61,18 @@ private def identifierLexer(str: String): Lexer = for {
             case "fn"     => Token.Function
             case "null"   => Token.Null
             case others   => Token.Ident(others)
-        )
+        }
 } yield token
 
-private def getChar: State[String, Char] = for {
-  str <- State.get[String]
-  char <-
-    if str.isEmpty() then State.pure(0.toChar) else State.set(str.substring(1)).map(_ => str.charAt(0))
-} yield char
+private def getChar: State[String, Char] =
+  State.get[String].flatMap { str =>
+    if str.isEmpty()
+    then State.pure(0.toChar)
+    else State.set(str.substring(1)).as(str.charAt(0))
+  }
 
 private def skipWhitespace(char0: Char): State[String, Char] =
-  State.get.flatMap(_ => if !char0.isWhitespace then State.pure(char0) else next)
+  if !char0.isWhitespace then State.pure(char0) else next
 
 private def next: State[String, Char] = getChar.flatMap(skipWhitespace)
 
