@@ -7,6 +7,7 @@ type Lexer = State[String, Token]
 
 def tokenize: Lexer = next.flatMap {
   case char: ('=' | '!')     => twoCharLexer(char)
+  case char: '"'             => stringLexer()
   case char: CodeLiteral     => State.pure(char.convertCharOfCodeToToken)
   case char if char.isDigit  => numberLexer(char.toString())
   case char if char.isLetter => identifierLexer(char.toString())
@@ -26,6 +27,11 @@ private def twoCharLexer(char0: Char): Lexer = for {
       if char1 == '=' then State.pure(Token.NotEq)
       else State.set(state0).map(_ => Token.Bang)
 } yield token
+
+private def stringLexer(str: String = ""): Lexer = getChar.flatMap {
+  case char: '"' => State.pure(Token.Str(str))
+  case char      => stringLexer(s"$str$char")
+}
 
 private def numberLexer(n: String): Lexer = for {
   state0 <- State.get[String]
