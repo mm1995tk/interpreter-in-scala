@@ -71,4 +71,4 @@ given Show[Token] with
     case Token.Return               => "return"
     case Token.Ident(value: String) => value
     case Token.Int(value: Int)      => value.toString()
-    case Token.Str(value: String)   => value
+    case Token.Str(value: String)   => s"\"$value\""

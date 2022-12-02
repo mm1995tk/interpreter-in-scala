@@ -12,22 +12,25 @@ enum Object:
     case obj: MonkeyPrimitiveType                     => obj
 
   case Int(value: scala.Int)
+  case Str(value: String)
   case Boolean(value: scala.Boolean)
   case ReturnValue(value: MonkeyPrimitiveType)
   case Function(params: Seq[Token.Ident], program: Program, env: Env)
   case Null
 
-type MonkeyPrimitiveType = Object.Int | Object.Boolean | Object.Null.type | Object.Function
+type MonkeyPrimitiveType = Object.Int | Object.Boolean | Object.Null.type | Object.Function | Object.Str
 
 extension (item: MonkeyPrimitiveType)
   def getType: String = item match
     case Object.Int(_)            => "Int"
+    case Object.Str(_)            => "String"
     case Object.Boolean(_)        => "Boolean"
     case Object.Null              => "null"
     case Object.Function(_, _, _) => "function"
 
   def getValue: Option[Int | Boolean | String] = item match
     case Object.Int(v)            => Some(v)
+    case Object.Str(v)            => Some(v)
     case Object.Boolean(v)        => Some(v)
     case Object.Function(_, _, _) => Some(item.asInstanceOf[Object].show)
     case Object.Null              => None
@@ -35,6 +38,7 @@ extension (item: MonkeyPrimitiveType)
 given Show[Object] with
   def show(obj: Object) = obj match
     case Object.Int(value)         => value.toString()
+    case Object.Str(value)         => value
     case Object.Boolean(value)     => value.toString()
     case Object.ReturnValue(value) => value.getValue.getOrElse("null").toString()
     case Object.Function(_, _, _)  => "function"

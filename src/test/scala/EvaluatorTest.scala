@@ -19,6 +19,17 @@ class EvaluatorTest extends munit.FunSuite {
       case _        => assert(false)
   }
 
+  test("文字列の評価") {
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA("let str = \"abc\"; str")
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(v) => assertEquals(v, obj.Object.Str("abc"))
+      case _        => assert(false)
+  }
+
   test("真偽値の評価") {
     val eitherResultOrErr = for {
       parsed <- parseProgram.runA("true")

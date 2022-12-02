@@ -7,6 +7,7 @@ import cats.data.{StateT, State}
 import cats.Show
 import cats.implicits.*
 import cats.kernel.Order
+import cats.Alternative
 
 type Parser[T] = StateT[EitherParserErrorOr, String, T]
 type EitherParserErrorOr[T] = Either[ParserError, T]
@@ -87,6 +88,7 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.Null         => Parser.nextToken.as(Expr.Null)
       case t @ Token.Ident(_) => Parser.nextToken.as(Expr.Ident(t))
       case t @ Token.Int(_)   => Parser.nextToken.as(Expr.Int(t))
+      case t @ Token.Str(_)   => Parser.nextToken.as(Expr.Str(t))
       case t: BoolToken       => Parser.nextToken.as(Expr.Bool(t))
       case t: PrefixToken     => parsePrefixExpr
       case Token.If           => parseIfExpr

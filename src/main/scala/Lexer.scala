@@ -31,6 +31,7 @@ private def twoCharLexer(char0: Char): Lexer = for {
 
 private def stringLexer(str: String = ""): Lexer = getChar.flatMap {
   case char: '"' => State.pure(Token.Str(str))
+  case 0         => State.pure(Token.Str(str))
   case char      => stringLexer(s"$str$char")
 }
 
