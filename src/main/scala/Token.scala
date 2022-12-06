@@ -31,6 +31,7 @@ enum Token:
     Null
   case Ident(value: String)
   case Int(value: scala.Int)
+  case Str(value: String)
 
 type PrefixToken = Token.Minus.type | Token.Bang.type
 
@@ -70,3 +71,4 @@ given Show[Token] with
     case Token.Return               => "return"
     case Token.Ident(value: String) => value
     case Token.Int(value: Int)      => value.toString()
+    case Token.Str(value: String)   => s"\"$value\""

@@ -50,6 +50,7 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
+  case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix   => evalPrefixExpr(expr)
@@ -123,6 +124,10 @@ private def evalPrefixExpr(item: Expr.Prefix): Evaluator[Object] =
       t match
         case Token.Minus => Object.Int(-v)
         case Token.Bang  => Object.Boolean(false)
+    case obj @ Object.Str(v) =>
+      t match
+        case Token.Minus => return Evaluator.pureErr(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType))
+        case Token.Bang  => Object.Boolean(false)
     case Object.Boolean(b) =>
       t match
         case Token.Minus => ConstNull
@@ -162,6 +167,11 @@ private def evalPlusOrMulOpInfixExpr(
           case Token.Plus     => l + r
           case Token.Asterisk => l * r
       })
+
+    case (lObj @ Object.Str(l), rObj @ Object.Str(r)) =>
+      t match
+        case Token.Plus     => Right(Object.Str(l + r))
+        case Token.Asterisk => Left(EvalError.TypeMismatch(lObj, rObj, t))
 
     case (Object.Boolean(l), Object.Boolean(r)) =>
       Right(Object.Boolean {
@@ -215,6 +225,7 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
     case Object.Boolean(bool)      => if bool then consequence else alter
     case Object.Null               => alter
     case Object.Int(value)         => consequence
+    case Object.Str(value)         => consequence
     case _: Object.Function        => consequence
   }
 

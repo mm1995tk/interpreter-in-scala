@@ -35,8 +35,9 @@ class ParserTest extends munit.FunSuite {
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
         stmt,
-        Statement.Expr (
-          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))), true
+        Statement.Expr(
+          Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))),
+          true
         )
       )
     }
@@ -56,7 +57,7 @@ class ParserTest extends munit.FunSuite {
     stmts.zip(expecteds).foreach { (stmt, expected) =>
       assertEquals(
         stmt,
-        Statement.Expr (Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))), false)
+        Statement.Expr(Expr.Prefix(expected._1, Expr.Int(Token.Int(expected._2))), false)
       )
     }
 
@@ -83,7 +84,7 @@ class ParserTest extends munit.FunSuite {
       val expected: InfixToken = item._2
       assertEquals(
         stmt,
-        Statement.Expr (Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5))), true)
+        Statement.Expr(Expr.Infix(expected, Expr.Int(Token.Int(5)), Expr.Int(Token.Int(5))), true)
       )
     }
 
@@ -131,7 +132,7 @@ class ParserTest extends munit.FunSuite {
     val stmt = stmts.head
     assert(stmt match
       case Statement.Expr(Expr.Ident(Token.Ident(value)), _) => value == "foobar"
-      case _                                              => false
+      case _                                                 => false
     )
 
   }
@@ -148,9 +149,21 @@ class ParserTest extends munit.FunSuite {
     val stmt = stmts.head
     assert(stmt match
       case Statement.Expr(Expr.Int(Token.Int(value)), _) => value == 5
-      case _                                          => false
+      case _                                             => false
     )
 
+  }
+
+  test("文字列リテラルのテスト") {
+    val input = "\"abc\""
+    val parsed = parseProgram.runA(input)
+    val stmts = parsed.getOrElse(Seq())
+
+    if stmts.length != 1 then
+      println(s"statementsの要素が1でない: ${stmts.length}")
+      assert(false)
+    
+    assertEquals(stmts.head, Statement.Expr(Expr.Str(Token.Str("abc")), false))
   }
 
   test("関数リテラルのテスト") {

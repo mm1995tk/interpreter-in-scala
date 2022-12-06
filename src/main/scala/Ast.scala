@@ -16,6 +16,7 @@ enum Expr:
   case Null
   case Ident(token: Token.Ident)
   case Int(token: Token.Int)
+  case Str(token: Token.Str)
   case Prefix(token: PrefixToken, right: Expr)
   case Infix(token: InfixToken, left: Expr, right: Expr)
   case Bool(token: BoolToken)
@@ -37,6 +38,7 @@ given Show[Expr] with
     case Expr.Null               => "null"
     case Expr.Ident(ident)       => ident.asInstanceOf[Token].show
     case Expr.Int(ident)         => ident.asInstanceOf[Token].show
+    case Expr.Str(ident)         => ident.asInstanceOf[Token].show
     case Expr.Prefix(ident, r)   => s"(${ident.asInstanceOf[Token].show}${r.show})"
     case Expr.Infix(ident, l, r) => s"(${l.show} ${ident.asInstanceOf[Token].show} ${r.show})"
     case Expr.Bool(token)        => token.equals(Token.True).toString()
