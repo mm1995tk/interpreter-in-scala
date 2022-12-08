@@ -117,4 +117,18 @@ class EvaluatorTest extends munit.FunSuite {
         case Left(e)                       => assert(false)
     )
   }
+
+  test("組み込み関数lenの呼び出し") {
+    val input = "let cntOfChar = len; cntOfChar(\"abcdefg\") + len(\"hijklmn\")"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj.unwrap.getValue, Some(14))
+      case _          => assert(false)
+
+  }
+
 }

@@ -10,6 +10,7 @@ import env.Env
 import cats.implicits._
 import cats.data.StateT
 import cats.Show
+import builtin.Builtin
 
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 type EitherEvalErrorOr[T] = Either[EvalError, T]
@@ -84,8 +85,8 @@ private def evalCallExpr(
       case Expr.Ident(t @ Token.Ident(key)) =>
         Evaluator.lift {
           env.get(key).toRight(EvalError.UncaughtReferenceError(t)).flatMap {
-            case obj: Object.Function => Right(obj)
-            case _                    => Left(???) // 関数以外のエラー
+            case obj: (Object.Function | Object.BuiltinObj) => Right(obj)
+            case _                                          => Left(???) // 関数以外のエラー
           }
         }
 
@@ -96,24 +97,45 @@ private def evalCallExpr(
           case _                                        => Evaluator.pureErr(???)
         }
 
-  }: Evaluator[Object.Function]
+  }: Evaluator[Object.Function | Object.BuiltinObj]
 
-  evaluatedArgs: Seq[(String, MonkeyPrimitiveType)] <-
-    if fnObj.params.length.equals(args.length) then
-      args
-        .map(evalExpr(_).map(_.unwrap))
-        .sequence
-        .map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1.unwrap)))
+  cntOfExpectedParams = fnObj match
+    case obj: Object.Function => obj.params.length
+    case Object.BuiltinObj(builtin) =>
+      builtin match
+        case Builtin.Len(f) => 1
+
+  _ <-
+    if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
     else
       Evaluator.pureErr {
-        EvalError.CountOfArgsMismatch(args.length, fnObj.params.length)
+        EvalError.CountOfArgsMismatch(args.length, cntOfExpectedParams)
       }
 
-  localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
-    acc.updated(cur._1, cur._2)
-  }
+  result <- fnObj match
+    case fnObj: Object.Function =>
+      for {
+        evaluatedArgs: Seq[(String, MonkeyPrimitiveType)] <- args
+          .map(evalExpr(_).map(_.unwrap))
+          .sequence
+          .map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1.unwrap)))
 
-  result <- Evaluator.setEnv(env.concat(localEnv)) *> evalProgram(fnObj.program) <* Evaluator.setEnv(env)
+        localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
+          acc.updated(cur._1, cur._2)
+        }
+
+        result <- Evaluator.setEnv(env.concat(localEnv)) *> evalProgram(fnObj.program) <* Evaluator.setEnv(
+          env
+        )
+      } yield result
+    case Object.BuiltinObj(builtin) =>
+      builtin match
+        case Builtin.Len(f) =>
+          args.map(evalExpr(_).map(_.unwrap)).head.flatMap {
+            case obj: Object.Str => Evaluator.pure(f(obj))
+            case _               => Evaluator.pureErr(???)
+          }
+
 } yield result
 
 private def evalPrefixExpr(item: Expr.Prefix): Evaluator[Object] =
@@ -136,6 +158,7 @@ private def evalPrefixExpr(item: Expr.Prefix): Evaluator[Object] =
     case obj: Object.Function =>
       return Evaluator.pureErr(EvalError.UnknownOperator(t, obj: MonkeyPrimitiveType))
     case Object.ReturnValue(value) => value
+    case _                         => return Evaluator.pureErr(???)
   }
 
 private def evalInfixExpr(item: Expr.Infix): Evaluator[Object] = for {
@@ -226,7 +249,7 @@ private def evalIfExpr(item: Expr.If): Evaluator[Object] =
     case Object.Null               => alter
     case Object.Int(value)         => consequence
     case Object.Str(value)         => consequence
-    case _: Object.Function        => consequence
+    case _                         => consequence
   }
 
   go(evalExpr(item.cond))
