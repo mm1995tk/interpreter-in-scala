@@ -109,7 +109,7 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
     case Token.LeftParen =>
       for {
         sym <- left match
-          case fn: (Expr.Fn | Expr.Ident | Expr.Call) => Parser.pure(fn)
+          case fn: (Expr.Fn | Expr.Ident | Expr.Call | Expr.If) => Parser.pure(fn)
           case _                                      => Parser.pureErr(ParserError.NotImplemented)
         params <- parseArgs(parseExpr())
         expr = Expr.Call(sym, params)
