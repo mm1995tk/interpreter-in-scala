@@ -31,36 +31,19 @@ private def parseStatement: Parser[Statement] = Parser.previewToken.flatMap {
 }
 
 private def parseLetStatement: Parser[Statement] = for {
-  let <- Parser.nextToken.flatMap {
-    case t @ Token.Let => Parser.pure(t)
-    case _             => Parser.pureErr(???)
-  }
+  let <- Parser.expect(Token.Let)
   ident <- Parser.nextToken.flatMap {
     case t: Token.Ident => Parser.pure(t)
-    case _              => Parser.pureErr(???)
+    case obtained       => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "name of vars"))
   }
-  assign <- Parser.nextToken.flatMap {
-    case t @ Token.Assign => Parser.pure(t)
-    case _                => Parser.pureErr(???)
-  }
+  assign <- Parser.expect(Token.Assign)
   expr <- parseExpr()
-  semicolon <- Parser.nextToken.flatMap {
-    case t @ Token.Semicolon => Parser.pure(t)
-    case _                   => Parser.pureErr(???)
-  }
+  semicolon <- Parser.expect(Token.Semicolon)
 } yield Statement.Let(ident, expr)
 
-private def parseReturnStatement: Parser[Statement] = for {
-  returnToken <- Parser.nextToken.flatMap {
-    case t @ Token.Return => Parser.pure(t)
-    case _                => Parser.pureErr(???)
-  }
-  expr <- parseExpr()
-  semicolon <- Parser.nextToken.flatMap {
-    case t @ Token.Semicolon => Parser.pure(t)
-    case _                   => Parser.pureErr(???)
-  }
-} yield Statement.Return(expr)
+private def parseReturnStatement: Parser[Statement] =
+  val expr = Parser.expect(Token.Return) *> parseExpr() <* Parser.expect(Token.Semicolon)
+  expr.map(Statement.Return(_))
 
 private def parseExprStatement: Parser[Statement] = for {
   expr <- parseExpr()
@@ -70,17 +53,8 @@ private def parseExprStatement: Parser[Statement] = for {
   }
 } yield Statement.Expr(expr, !optionalSemicolon.isEmpty)
 
-private def parseBlockStatement: Parser[Program] = for {
-  lBrace <- Parser.nextToken.flatMap {
-    case t @ Token.LeftBrace => Parser.pure(t)
-    case _                   => Parser.pureErr(???)
-  }
-  program <- parse(Seq(), Token.RightBrace)
-  rBrace <- Parser.nextToken.flatMap {
-    case t @ Token.RightBrace => Parser.pure(t)
-    case _                    => Parser.pureErr(???)
-  }
-} yield program
+private def parseBlockStatement: Parser[Program] =
+  Parser.expect(Token.LeftBrace) *> parse(Seq(), Token.RightBrace) <* Parser.expect(Token.RightBrace)
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
   for {
@@ -95,7 +69,7 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.LeftParen    => parseGroupExpr
       case Token.LeftBracket  => parseArr
       case Token.Function     => paraseFnLiteral
-      case _                  => Parser.pureErr(ParserError.NotImplemented)
+      case obtained => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "atomic expression"))
     }
     expr <- parseFoldExprFromLeft(left, precedence)
   } yield expr
@@ -111,7 +85,8 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
       for {
         sym <- left match
           case fn: (Expr.Fn | Expr.Ident | Expr.Call | Expr.If) => Parser.pure(fn)
-          case _ => Parser.pureErr(ParserError.NotImplemented)
+          case _ =>
+            Parser.pureErr(ParserError.Message("need to expression that returns a function when evaluated"))
         params <- parseArgs(parseExpr(), Token.RightParen)
         expr = Expr.Call(sym, params)
         result <- parseFoldExprFromLeft(expr, precedence)
@@ -120,7 +95,7 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
       for {
         arrLit <- left match
           case _: (Expr.Int | Expr.Str | Expr.Null.type | Expr.Bool) =>
-            Parser.pureErr(ParserError.NotImplemented)
+            Parser.pureErr(ParserError.Message("need to expression that returns a array when evaluated"))
           case expr => Parser.pure(expr)
         index <- Parser.nextToken *> parseExpr() <* Parser.nextToken
         expr = Expr.Index(arrLit, index)
@@ -134,16 +109,13 @@ private def parseArr: Parser[Expr] = parseArgs[Expr](parseExpr(), Token.RightBra
 private def parsePrefixExpr: Parser[Expr] = for {
   prefixToken: PrefixToken <- Parser.nextToken.flatMap {
     case t: PrefixToken => Parser.pure(t)
-    case _              => Parser.pureErr(???)
+    case obtained       => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "prefix token"))
   }
   expr <- parseExpr(Precedence.Prefix)
 } yield Expr.Prefix(prefixToken, expr)
 
 private def parseIfExpr: Parser[Expr] = for {
-  ifToken <- Parser.nextToken.flatMap {
-    case t @ Token.If => Parser.pure(t)
-    case _            => Parser.pureErr(???)
-  }
+  ifToken <- Parser.expect(Token.If)
   cond <- parseGroupExpr
   consequence <- parseBlockStatement
   alter <- Parser.previewToken.flatMap {
@@ -157,14 +129,11 @@ private def parseIfExpr: Parser[Expr] = for {
 } yield Expr.If(cond, consequence, alter)
 
 private def paraseFnLiteral: Parser[Expr] = for {
-  fn <- Parser.nextToken.flatMap {
-    case t @ Token.Function => Parser.pure(t)
-    case _                  => Parser.pureErr(???)
-  }
+  fn <- Parser.expect(Token.Function)
   args <- parseArgs(
     Parser.nextToken.flatMap {
       case t: Token.Ident => Parser.pure(Expr.Ident(t))
-      case _              => Parser.pureErr(???)
+      case obtained       => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "name of vars"))
     }: Parser[Expr.Ident],
     Token.RightParen
   )
@@ -180,11 +149,10 @@ private def parseArgs[T](
     arg <- parserOfArg
     updatedArgs: Seq[T] = args :+ arg
     args <- Parser.previewToken.flatMap {
-      case Token.Comma => Parser.nextToken *> go(parserOfArg, updatedArgs)
-      case t: (Token.RightParen.type | Token.RightBracket.type) => Parser.pure(updatedArgs)
-      case t =>
-        println(t)
-        Parser.pureErr(???)
+      case Token.Comma             => Parser.nextToken *> go(parserOfArg, updatedArgs)
+      case t if t.equals(endToken) => Parser.pure(updatedArgs)
+      case obtained =>
+        Parser.pureErr(ParserError.UnexpectedTokenText(obtained, s"',' or '${endToken.show}'"))
     }
   } yield args
   end go
@@ -192,33 +160,12 @@ private def parseArgs[T](
   endToken match
     case Token.RightParen => parseBetweenParen(go(parserOfArg, args))
     case Token.RightBracket =>
-      for {
-        lb <- Parser.nextToken.flatMap {
-          case Token.LeftBracket => Parser.pure(())
-          case _                 => Parser.pureErr(???)
-        }
-
-        elems <- go(parserOfArg, args)
-
-        rb <- Parser.nextToken.flatMap {
-          case Token.RightBracket => Parser.pure(())
-          case _                  => Parser.pureErr(???)
-        }
-      } yield elems
+      Parser.expect(Token.LeftBracket) *> go(parserOfArg, args) <* Parser.expect(Token.RightBracket)
 
 private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
 
-private def parseBetweenParen[T](parser: Parser[T]): Parser[T] = for {
-  lParen <- Parser.nextToken.flatMap {
-    case t if t.equals(Token.LeftParen) => Parser.pure(t)
-    case _                              => Parser.pureErr(???)
-  }
-  main <- parser
-  rParen <- Parser.nextToken.flatMap {
-    case t if t.equals(Token.RightParen) => Parser.pure(t)
-    case _                               => Parser.pureErr(???)
-  }
-} yield main
+private def parseBetweenParen[T](parser: Parser[T]): Parser[T] =
+  Parser.expect(Token.LeftParen) *> parser <* Parser.expect(Token.RightParen)
 
 private object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)
@@ -234,15 +181,27 @@ private object Parser:
     _ <- StateT.set(str)
   } yield token
 
+  def expect(expected: Token): Parser[Unit] = Parser.nextToken.flatMap {
+    case obtained if expected.ordinal == obtained.ordinal => Parser.pure(())
+    case obtained => Parser.pureErr(ParserError.UnexpectedToken(obtained, expected))
+  }
+
 enum ParserError:
-  case NotImplemented
-  case UnexpectedToken(obtained: Token, expexted: Token)
+  case Message(content: String)
+  case UnexpectedToken(obtained: Token, expected: Token)
+  case UnexpectedTokenText(obtained: Token, expected: String)
 
 given Show[ParserError] with
-  def show(t: ParserError): String = t match
-    case ParserError.NotImplemented => "not impl"
-    case ParserError.UnexpectedToken(obtained, expected) =>
-      s"expected token is \"${expected.show}\", but obatained is \"${obtained.show}\""
+  def show(t: ParserError): String =
+    def unexpected(obtained: Token, expected: String) =
+      val obtainedStr = obtained.show
+      s"expected token is $expected, but obatained is '${
+          if obtainedStr.trim().isEmpty() then "nothing" else obtainedStr
+        }'"
+    t match
+      case ParserError.Message(content)                        => content
+      case ParserError.UnexpectedToken(obtained, expected)     => unexpected(obtained, expected.show)
+      case ParserError.UnexpectedTokenText(obtained, expected) => unexpected(obtained, expected)
 
 private enum Precedence:
   case Lowest, Equals, LessOrGreater, Sum, Product, Prefix, Call
