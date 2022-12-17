@@ -116,6 +116,16 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
         expr = Expr.Call(sym, params)
         result <- parseFoldExprFromLeft(expr, precedence)
       } yield result
+    case Token.LeftBracket =>
+      for {
+        arrLit <- left match
+          case _: (Expr.Int | Expr.Str | Expr.Null.type | Expr.Bool) =>
+            Parser.pureErr(ParserError.NotImplemented)
+          case expr => Parser.pure(expr)
+        index <- Parser.nextToken *> parseExpr() <* Parser.nextToken
+        expr = Expr.Index(arrLit, index)
+        result <- parseFoldExprFromLeft(expr, precedence)
+      } yield result
     case _ => Parser.pure(left)
   }
 

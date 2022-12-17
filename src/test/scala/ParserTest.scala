@@ -213,6 +213,33 @@ class ParserTest extends munit.FunSuite {
         assert(false)
 
   }
+
+  test("添え字アクセスのテスト") {
+    val parsed = parseProgram.runA("arr[6];")
+    parsed match
+      case Right(v) => assertEquals(v.show, "arr[6];")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
+
+  test("添え字アクセスのテスト2") {
+    val parsed = parseProgram.runA("[1, 8][0];")
+    parsed match
+      case Right(v) => assertEquals(v.show, "[1, 8][0];")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
+
+  test("添え字アクセスのテスト3") {
+    val parsed = parseProgram.runA("fn(x) {[x,1]}[0];")
+    parsed match
+      case Right(v) => assertEquals(v.show, "fn(x) {[x, 1]}[0];")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
 }
 
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
