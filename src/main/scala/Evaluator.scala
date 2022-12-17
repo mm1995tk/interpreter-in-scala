@@ -154,8 +154,8 @@ private def evalCallExpr(
       builtin match
         case Builtin.Len(f) =>
           args.map(evalExpr(_).map(_.unwrap)).head.flatMap {
-            case obj: Object.Str => Evaluator.pure(f(obj))
-            case _               => Evaluator.pureErr(???)
+            case obj: (Object.Str | Object.Arr) => Evaluator.pure(f(obj))
+            case _                              => Evaluator.pureErr(???)
           }
 
 } yield result
