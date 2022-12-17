@@ -42,8 +42,7 @@ private def parseLetStatement: Parser[Statement] = for {
 } yield Statement.Let(ident, expr)
 
 private def parseReturnStatement: Parser[Statement] =
-  val expr = Parser.expect(Token.Return) *> parseExpr() <* Parser.expect(Token.Semicolon)
-  expr.map(Statement.Return(_))
+  Parser.expect(Token.Return) *> parseExpr().map(Statement.Return(_)) <* Parser.expect(Token.Semicolon)
 
 private def parseExprStatement: Parser[Statement] = for {
   expr <- parseExpr()
@@ -119,12 +118,8 @@ private def parseIfExpr: Parser[Expr] = for {
   cond <- parseGroupExpr
   consequence <- parseBlockStatement
   alter <- Parser.previewToken.flatMap {
-    case Token.Else =>
-      for {
-        elseClause <- Parser.nextToken
-        program <- parseBlockStatement
-      } yield Some(program)
-    case _ => Parser.pure(None)
+    case Token.Else => Parser.nextToken *> parseBlockStatement.map(Some(_))
+    case _          => Parser.pure(None)
   }
 } yield Expr.If(cond, consequence, alter)
 
