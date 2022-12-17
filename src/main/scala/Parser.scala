@@ -86,7 +86,7 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
           case fn: (Expr.Fn | Expr.Ident | Expr.Call | Expr.If) => Parser.pure(fn)
           case _ =>
             Parser.pureErr(ParserError.Message("need to expression that returns a function when evaluated"))
-        params <- parseArgs(parseExpr(), Token.RightParen)
+        params <- parseBetweenParen(parseCommaSeparatedExprs(parseExpr(), Token.RightParen))
         expr = Expr.Call(sym, params)
         result <- parseFoldExprFromLeft(expr, precedence)
       } yield result
@@ -103,7 +103,10 @@ private def parseFoldExprFromLeft(left: Expr, precedence: Precedence): Parser[Ex
     case _ => Parser.pure(left)
   }
 
-private def parseArr: Parser[Expr] = parseArgs[Expr](parseExpr(), Token.RightBracket).map(Expr.Arr(_))
+private def parseArr: Parser[Expr] =
+  Parser.expect(Token.LeftBracket)
+    *> parseCommaSeparatedExprs[Expr](parseExpr(), Token.RightBracket).map(Expr.Arr(_))
+    <* Parser.expect(Token.RightBracket)
 
 private def parsePrefixExpr: Parser[Expr] = for {
   prefixToken: PrefixToken <- Parser.nextToken.flatMap {
@@ -125,26 +128,28 @@ private def parseIfExpr: Parser[Expr] = for {
 
 private def paraseFnLiteral: Parser[Expr] = for {
   fn <- Parser.expect(Token.Function)
-  args <- parseArgs(
-    Parser.nextToken.flatMap {
-      case t: Token.Ident => Parser.pure(Expr.Ident(t))
-      case obtained       => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "name of vars"))
-    }: Parser[Expr.Ident],
-    Token.RightParen
+  args <- parseBetweenParen(
+    parseCommaSeparatedExprs(
+      Parser.nextToken.flatMap {
+        case t: Token.Ident => Parser.pure(Expr.Ident(t))
+        case obtained       => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "name of vars"))
+      }: Parser[Expr.Ident],
+      Token.RightParen
+    )
   )
   body <- parseBlockStatement
 } yield Expr.Fn(args, body)
 
-private def parseArgs[T](
-    parserOfArg: Parser[T],
-    endToken: Token.RightParen.type | Token.RightBracket.type,
-    args: Seq[T] = Seq()
+private def parseCommaSeparatedExprs[T](
+    parser: Parser[T],
+    endToken: Token,
+    acc: Seq[T] = Seq()
 ): Parser[Seq[T]] =
-  def go[T](parserOfArg: Parser[T], args: Seq[T]): Parser[Seq[T]] = for {
-    arg <- parserOfArg
-    updatedArgs: Seq[T] = args :+ arg
+  def go[T](parser: Parser[T], exprs: Seq[T]): Parser[Seq[T]] = for {
+    expr <- parser
+    updatedArgs: Seq[T] = exprs :+ expr
     args <- Parser.previewToken.flatMap {
-      case Token.Comma             => Parser.nextToken *> go(parserOfArg, updatedArgs)
+      case Token.Comma             => Parser.nextToken *> go(parser, updatedArgs)
       case t if t.equals(endToken) => Parser.pure(updatedArgs)
       case obtained =>
         Parser.pureErr(ParserError.UnexpectedTokenText(obtained, s"',' or '${endToken.show}'"))
@@ -152,10 +157,7 @@ private def parseArgs[T](
   } yield args
   end go
 
-  endToken match
-    case Token.RightParen => parseBetweenParen(go(parserOfArg, args))
-    case Token.RightBracket =>
-      Parser.expect(Token.LeftBracket) *> go(parserOfArg, args) <* Parser.expect(Token.RightBracket)
+  go(parser, acc)
 
 private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
 
