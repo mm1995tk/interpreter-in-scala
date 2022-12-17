@@ -52,7 +52,8 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
-  case Expr.Arr(elems)        => ???
+  case Expr.Arr(elems)        => elems.map(evalExpr(_)).sequence.map(Object.Arr(_))
+  case Expr.Index(obj, index) => evalIndexAccess(obj, index)
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix   => evalPrefixExpr(expr)
@@ -73,6 +74,20 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
 
   case Expr.Fn(params, body) =>
     Evaluator.getEnv.map { Object.Function(params.map(_.token), body, _) }
+
+private def evalIndexAccess(obj: Expr, index: Expr): Evaluator[Object] = for {
+  arr <- evalExpr(obj).flatMap {
+    case Object.Arr(elems) => Evaluator.pure(elems)
+    case _                 => Evaluator.pureErr(???)
+  }
+  n <- evalExpr(index).flatMap {
+    case Object.Int(n) => Evaluator.pure(n)
+    case _             => Evaluator.pureErr(???)
+  }
+  result <- arr.get(n) match
+    case Some(v) => Evaluator.pure(v)
+    case None    => Evaluator.pureErr(???)
+} yield result
 
 private def evalCallExpr(
     fn: Expr.Ident | Expr.Fn | Expr.Call | Expr.If,
