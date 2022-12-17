@@ -162,7 +162,7 @@ class ParserTest extends munit.FunSuite {
     if stmts.length != 1 then
       println(s"statementsの要素が1でない: ${stmts.length}")
       assert(false)
-    
+
     assertEquals(stmts.head, Statement.Expr(Expr.Str(Token.Str("abc")), false))
   }
 
@@ -198,6 +198,16 @@ class ParserTest extends munit.FunSuite {
     val parsed = parseProgram.runA("fn(x, y) {x+ y}(1 +4, 2)")
     parsed match
       case Right(v) => assertEquals(v.show, "fn(x, y) {(x + y)}((1 + 4), 2)")
+      case Left(v) =>
+        println(v)
+        assert(false)
+
+  }
+
+  test("配列のテスト") {
+    val parsed = parseProgram.runA("let arr = [1, 2, 3];")
+    parsed match
+      case Right(v) => assertEquals(v.show, "let arr = [1, 2, 3];")
       case Left(v) =>
         println(v)
         assert(false)

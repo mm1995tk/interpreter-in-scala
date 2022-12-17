@@ -77,7 +77,7 @@ private def skipWhitespace(char0: Char): State[String, Char] =
 
 private def next: State[String, Char] = getChar.flatMap(skipWhitespace)
 
-private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | ',' | ';'
+private type CodeLiteral = '+' | '-' | '/' | '*' | '<' | '>' | '(' | ')' | '{' | '}' | '[' | ']' | ',' | ';'
 extension (item: CodeLiteral)
   private def convertCharOfCodeToToken =
     item match
@@ -91,5 +91,7 @@ extension (item: CodeLiteral)
       case ')' => Token.RightParen
       case '{' => Token.LeftBrace
       case '}' => Token.RightBrace
+      case '[' => Token.LeftBracket
+      case ']' => Token.RightBracket
       case ',' => Token.Comma
       case ';' => Token.Semicolon

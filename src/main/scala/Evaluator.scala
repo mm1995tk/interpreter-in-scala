@@ -52,6 +52,7 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
+  case Expr.Arr(elems)        => ???
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix   => evalPrefixExpr(expr)

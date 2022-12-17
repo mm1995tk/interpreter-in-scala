@@ -21,6 +21,8 @@ enum Token:
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Function,
     Let,
     True,
@@ -62,6 +64,8 @@ given Show[Token] with
     case Token.RightParen           => ")"
     case Token.LeftBrace            => "{"
     case Token.RightBrace           => "}"
+    case Token.LeftBracket          => "["
+    case Token.RightBracket         => "]"
     case Token.Function             => "fn"
     case Token.Let                  => "let"
     case Token.True                 => "true"
