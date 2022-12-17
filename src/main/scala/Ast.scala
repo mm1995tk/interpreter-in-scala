@@ -22,7 +22,7 @@ enum Expr:
   case Bool(token: BoolToken)
   case If(cond: Expr, consequence: Program, alter: Option[Program])
   case Fn(parms: Seq[Expr.Ident], body: Program)
-  case Call(fn: Expr.Ident | Expr.Fn | Expr.Call, args: Seq[Expr])
+  case Call(fn: Expr.Ident | Expr.Fn | Expr.Call | Expr.If, args: Seq[Expr])
 
 given Show[Program] with
   def show(program: Program): String = program.map(_.show).mkString

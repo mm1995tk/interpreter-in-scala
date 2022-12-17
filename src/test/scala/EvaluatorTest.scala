@@ -117,4 +117,32 @@ class EvaluatorTest extends munit.FunSuite {
         case Left(e)                       => assert(false)
     )
   }
+
+  test("結果が関数のif式を即時実行") {
+
+    val input = "if (true) {fn(x) {x + 1} }(1)"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(Object.Int(v)) => assertEquals(v, 2)
+      case _                    => assert(false)
+
+  }
+
+  test("組み込み関数lenの呼び出し") {
+    val input = "let cntOfChar = len; cntOfChar(\"abcdefg\") + len(\"hijklmn\")"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj.unwrap.getValue, Some(14))
+      case _          => assert(false)
+
+  }
+
 }
