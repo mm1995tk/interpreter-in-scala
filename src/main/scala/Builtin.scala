@@ -1,7 +1,6 @@
 package evaluator.builtin
 
 import obj.{Object, MonkeyPrimitiveType}
-import scala.collection.immutable.HashMap
 import evaluator.{Evaluator, EvalError}
 
 case class Builtin(f: Seq[Object] => Evaluator[Object], cntOfArgs: scala.Int)
