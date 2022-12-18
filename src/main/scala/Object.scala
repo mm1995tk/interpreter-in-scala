@@ -5,7 +5,7 @@ import ast.{Statement, Program}
 import env.Env
 import cats.Show
 import cats.implicits.toShow
-import builtin.Builtin
+import evaluator.builtin.Builtin
 
 enum Object:
   def unwrap: MonkeyPrimitiveType = this match

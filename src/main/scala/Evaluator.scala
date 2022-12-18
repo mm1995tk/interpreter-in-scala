@@ -10,7 +10,7 @@ import env.Env
 import cats.implicits._
 import cats.data.StateT
 import cats.Show
-import builtin.Builtin
+import evaluator.builtin.*
 
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 type EitherEvalErrorOr[T] = Either[EvalError, T]
@@ -122,10 +122,8 @@ private def evalCallExpr(
   }: Evaluator[Object.Function | Object.BuiltinObj]
 
   cntOfExpectedParams = fnObj match
-    case obj: Object.Function => obj.params.length
-    case Object.BuiltinObj(builtin) =>
-      builtin match
-        case Builtin.Len(f) => 1
+    case obj: Object.Function             => obj.params.length
+    case Object.BuiltinObj(Builtin(_, n)) => n
 
   _ <-
     if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
@@ -150,13 +148,7 @@ private def evalCallExpr(
           env
         )
       } yield result
-    case Object.BuiltinObj(builtin) =>
-      builtin match
-        case Builtin.Len(f) =>
-          args.map(evalExpr(_).map(_.unwrap)).head.flatMap {
-            case obj: (Object.Str | Object.Arr) => Evaluator.pure(f(obj))
-            case _                              => Evaluator.pureErr(???)
-          }
+    case Object.BuiltinObj(builtin) => args.map(evalExpr(_)).sequence.map(_.toList).flatMap(builtin.f)
 
 } yield result
 
