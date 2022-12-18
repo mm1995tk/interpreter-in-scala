@@ -38,3 +38,14 @@ def tail: Builtin = Builtin(
   },
   1
 )
+
+def push: Builtin = Builtin(
+  {
+    case h1 :: h2 :: Seq() =>
+      h1 match
+        case Object.Arr(elems) => Evaluator.pure(Object.Arr(elems :+ h2))
+        case other             => Evaluator.pureErr(???)
+    case seq => Evaluator.pureErr(EvalError.CountOfArgsMismatch(seq.length, 2))
+  },
+  2
+)
