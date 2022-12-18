@@ -2,7 +2,7 @@ package env
 
 import obj.{MonkeyPrimitiveType, Object}
 import scala.collection.immutable.HashMap
-import builtin.Builtin
+import evaluator.builtin.Builtin
 
 type Env = HashMap[String, MonkeyPrimitiveType]
 

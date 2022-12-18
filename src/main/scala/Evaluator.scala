@@ -10,7 +10,7 @@ import env.Env
 import cats.implicits._
 import cats.data.StateT
 import cats.Show
-import builtin.Builtin
+import evaluator.builtin.*
 
 type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 type EitherEvalErrorOr[T] = Either[EvalError, T]
@@ -52,6 +52,8 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
+  case Expr.Arr(elems)        => elems.map(evalExpr(_)).sequence.map(Object.Arr(_))
+  case Expr.Index(obj, index) => evalIndexAccess(obj, index)
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })
   case expr: Expr.Prefix   => evalPrefixExpr(expr)
@@ -72,6 +74,20 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
 
   case Expr.Fn(params, body) =>
     Evaluator.getEnv.map { Object.Function(params.map(_.token), body, _) }
+
+private def evalIndexAccess(obj: Expr, index: Expr): Evaluator[Object] = for {
+  arr <- evalExpr(obj).flatMap {
+    case Object.Arr(elems) => Evaluator.pure(elems)
+    case _                 => Evaluator.pureErr(???)
+  }
+  n <- evalExpr(index).flatMap {
+    case Object.Int(n) => Evaluator.pure(n)
+    case _             => Evaluator.pureErr(???)
+  }
+  result <- arr.get(n) match
+    case Some(v) => Evaluator.pure(v)
+    case None    => Evaluator.pureErr(???)
+} yield result
 
 private def evalCallExpr(
     fn: Expr.Ident | Expr.Fn | Expr.Call | Expr.If,
@@ -106,10 +122,8 @@ private def evalCallExpr(
   }: Evaluator[Object.Function | Object.BuiltinObj]
 
   cntOfExpectedParams = fnObj match
-    case obj: Object.Function => obj.params.length
-    case Object.BuiltinObj(builtin) =>
-      builtin match
-        case Builtin.Len(f) => 1
+    case obj: Object.Function             => obj.params.length
+    case Object.BuiltinObj(Builtin(_, n)) => n
 
   _ <-
     if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
@@ -134,13 +148,7 @@ private def evalCallExpr(
           env
         )
       } yield result
-    case Object.BuiltinObj(builtin) =>
-      builtin match
-        case Builtin.Len(f) =>
-          args.map(evalExpr(_).map(_.unwrap)).head.flatMap {
-            case obj: Object.Str => Evaluator.pure(f(obj))
-            case _               => Evaluator.pureErr(???)
-          }
+    case Object.BuiltinObj(builtin) => args.map(evalExpr(_)).sequence.map(_.toList).flatMap(builtin.f)
 
 } yield result
 

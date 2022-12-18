@@ -1,7 +1,7 @@
 import parser.{parseProgram}
 import env.Env
 import evaluator.evalProgram
-import obj.{getValue, Object, MonkeyPrimitiveType}
+import obj.{Object, MonkeyPrimitiveType}
 import cats.implicits.toShow
 import parser.ParserError
 import evaluator.EvalError
@@ -27,7 +27,7 @@ class TotalTest extends munit.FunSuite {
         println(value)
         assert(false)
       case Right(value) =>
-        assertEquals(value.unwrap.getValue, Some(9))
+        assertEquals(value.unwrap.asInstanceOf[Object], Object.Int(9))
       case _ => assert(false)
   }
 
@@ -50,7 +50,7 @@ class TotalTest extends munit.FunSuite {
         println(value)
         assert(false)
       case Right(value) =>
-        assertEquals(value.unwrap.getValue, Some(5))
+        assertEquals(value.unwrap.asInstanceOf[Object], Object.Int(5))
       case _ => assert(false)
   }
 
@@ -73,7 +73,7 @@ class TotalTest extends munit.FunSuite {
         println(value)
         assert(false)
       case Right(value) =>
-        assertEquals(value.unwrap.getValue, Some(1))
+        assertEquals(value.unwrap.asInstanceOf[Object], Object.Int(1))
       case _ => assert(false)
   }
 
