@@ -67,6 +67,7 @@ private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] 
       case Token.If           => parseIfExpr
       case Token.LeftParen    => parseGroupExpr
       case Token.LeftBracket  => parseArr
+      case Token.LeftBrace    => parseHashmap
       case Token.Function     => paraseFnLiteral
       case obtained => Parser.pureErr(ParserError.UnexpectedTokenText(obtained, "atomic expression"))
     }
@@ -107,6 +108,20 @@ private def parseArr: Parser[Expr] =
   Parser.expect(Token.LeftBracket)
     *> parseCommaSeparatedExprs[Expr](parseExpr(), Token.RightBracket).map(Expr.Arr(_))
     <* Parser.expect(Token.RightBracket)
+
+private def parseHashmap: Parser[Expr] =
+  val parseKeyValue: Parser[(Expr, Expr)] = for {
+    k <- parseExpr()
+    _ <- Parser.expect(Token.Colon)
+    v <- parseExpr()
+  } yield k -> v
+
+  parseBetweenBrace {
+    Parser.previewToken.flatMap {
+      case Token.RightBrace => Parser.pure(Expr.HashMap(Seq()))
+      case _ => parseCommaSeparatedExprs(parseKeyValue, Token.RightBrace).map(Expr.HashMap(_))
+    }
+  }
 
 private def parsePrefixExpr: Parser[Expr] = for {
   prefixToken: PrefixToken <- Parser.nextToken.flatMap {
@@ -164,6 +179,9 @@ private def parseGroupExpr: Parser[Expr] = parseBetweenParen(parseExpr())
 
 private def parseBetweenParen[T](parser: Parser[T]): Parser[T] =
   Parser.expect(Token.LeftParen) *> parser <* Parser.expect(Token.RightParen)
+
+private def parseBetweenBrace[T](parser: Parser[T]): Parser[T] =
+  Parser.expect(Token.LeftBrace) *> parser <* Parser.expect(Token.RightBrace)
 
 private object Parser:
   def pure[T](t: T): Parser[T] = StateT.pure(t)

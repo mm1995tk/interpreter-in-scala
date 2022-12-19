@@ -53,6 +53,7 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
   case Expr.Arr(elems)        => elems.map(evalExpr(_)).sequence.map(Object.Arr(_))
+  case Expr.HashMap(kvs)      => ???
   case Expr.Index(obj, index) => evalIndexAccess(obj, index)
   case Expr.Bool(t) =>
     Evaluator.pure(Object.Boolean { t.equals(Token.True) })

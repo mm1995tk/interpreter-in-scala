@@ -240,6 +240,33 @@ class ParserTest extends munit.FunSuite {
         println(v)
         assert(false)
   }
+
+  test("hashmapのテスト") {
+    val parsed = parseProgram.runA("{\"x\": 0, \"y\": 0}")
+    parsed match
+      case Right(v) => assertEquals(v.show, "{\"x\": 0, \"y\": 0}")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
+
+  test("hashmapのテスト2") {
+    val parsed = parseProgram.runA("{}")
+    parsed match
+      case Right(v) => assertEquals(v.show, "{}")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
+
+  test("hashmapのテスト3") {
+    val parsed = parseProgram.runA("{1: 1, true: 1}")
+    parsed match
+      case Right(v) => assertEquals(v.show, "{1: 1, true: 1}")
+      case Left(v) =>
+        println(v)
+        assert(false)
+  }
 }
 
 val 異なる優先度の演算子が混在するテストのデータ = Seq(
