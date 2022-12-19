@@ -143,7 +143,7 @@ private def evalCallExpr(
 
   _ <- cntOfExpectedParams match
     case Some(n) =>
-      if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
+      if args.length.equals(n) then Evaluator.pure(())
       else
         Evaluator.pureErr {
           EvalError.CountOfArgsMismatch(args.length, n)
