@@ -146,8 +146,9 @@ private def parseCommaSeparatedExprs[T](
     acc: Seq[T] = Seq()
 ): Parser[Seq[T]] =
   def go[T](parser: Parser[T], exprs: Seq[T]): Parser[Seq[T]] = for {
-    expr <- parser
-    updatedArgs: Seq[T] = exprs :+ expr
+    p <- Parser.previewToken
+    expr <- if p.equals(endToken) then Parser.pure(Seq()) else parser.map(Seq(_))
+    updatedArgs: Seq[T] = exprs.concat(expr)
     args <- Parser.previewToken.flatMap {
       case Token.Comma             => Parser.nextToken *> go(parser, updatedArgs)
       case t if t.equals(endToken) => Parser.pure(updatedArgs)
