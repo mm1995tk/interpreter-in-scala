@@ -82,15 +82,25 @@ private def evalExpr(expr: Expr): Evaluator[Object] = expr match
     Evaluator.getEnv.map { Object.Function(params.map(_.token), body, _) }
 
 private def evalIndexAccess(obj: Expr, index: Expr): Evaluator[Object] = for {
-  arr <- evalExpr(obj).flatMap {
-    case Object.Arr(elems) => Evaluator.pure(elems)
-    case _                 => Evaluator.pureErr(???)
+  target <- evalExpr(obj).flatMap {
+    case o: (Object.Arr | Object.HashMap) => Evaluator.pure(o)
+    case _                                => Evaluator.pureErr(???)
   }
-  n <- evalExpr(index).flatMap {
+  accessor <- evalExpr(index)
+  r <- target match
+    case obj: Object.Arr => evalIndexAccessArr(obj, accessor)
+    case Object.HashMap(hashmap) =>
+      hashmap.get(accessor) match
+        case Some(v) => Evaluator.pure(v)
+        case None    => Evaluator.pureErr(???)
+} yield r
+
+private def evalIndexAccessArr(obj: Object.Arr, index: Object): Evaluator[Object] = for {
+  n <- index match
     case Object.Int(n) => Evaluator.pure(n)
     case _             => Evaluator.pureErr(???)
-  }
-  result <- arr.get(n) match
+
+  result <- obj.elems.get(n) match
     case Some(v) => Evaluator.pure(v)
     case None    => Evaluator.pureErr(???)
 } yield result
