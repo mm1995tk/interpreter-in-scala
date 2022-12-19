@@ -16,6 +16,7 @@ enum Token:
     Eq,
     NotEq,
     Comma,
+    Colon,
     Semicolon,
     LeftParen,
     RightParen,
@@ -59,6 +60,7 @@ given Show[Token] with
     case Token.Eq                   => "=="
     case Token.NotEq                => "!="
     case Token.Comma                => ","
+    case Token.Colon                => ":"
     case Token.Semicolon            => ";"
     case Token.LeftParen            => "("
     case Token.RightParen           => ")"
