@@ -9,5 +9,6 @@ def Env(): Env = Map[String, MonkeyPrimitiveType](
   "len" -> Object.BuiltinObj(len),
   "head" -> Object.BuiltinObj(head),
   "tail" -> Object.BuiltinObj(tail),
-  "push" -> Object.BuiltinObj(push)
+  "push" -> Object.BuiltinObj(push),
+  "puts" -> Object.BuiltinObj(puts)
 )

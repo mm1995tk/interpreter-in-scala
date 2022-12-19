@@ -137,16 +137,18 @@ private def evalCallExpr(
 
   }: Evaluator[Object.Function | Object.BuiltinObj]
 
-  cntOfExpectedParams = fnObj match
-    case obj: Object.Function             => obj.params.length
+  cntOfExpectedParams: Option[Int] = fnObj match
+    case obj: Object.Function             => Some(obj.params.length)
     case Object.BuiltinObj(Builtin(_, n)) => n
 
-  _ <-
-    if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
-    else
-      Evaluator.pureErr {
-        EvalError.CountOfArgsMismatch(args.length, cntOfExpectedParams)
-      }
+  _ <- cntOfExpectedParams match
+    case Some(n) =>
+      if args.length.equals(cntOfExpectedParams) then Evaluator.pure(())
+      else
+        Evaluator.pureErr {
+          EvalError.CountOfArgsMismatch(args.length, n)
+        }
+    case None => Evaluator.pure(())
 
   result <- fnObj match
     case fnObj: Object.Function =>
