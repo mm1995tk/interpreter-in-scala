@@ -1,7 +1,7 @@
 import parser.{parseProgram}
 import env.Env
 import evaluator.evalProgram
-import obj.{getValue, Object, MonkeyPrimitiveType}
+import obj.{Object, MonkeyPrimitiveType}
 import cats.implicits.toShow
 import parser.ParserError
 import evaluator.EvalError
@@ -16,6 +16,17 @@ class EvaluatorTest extends munit.FunSuite {
 
     eitherResultOrErr match
       case Right(v) => assertEquals(v, obj.Object.Int(5))
+      case _        => assert(false)
+  }
+
+  test("文字列の評価") {
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA("let str = \"abc\"; str")
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(v) => assertEquals(v, obj.Object.Str("abc"))
       case _        => assert(false)
   }
 
@@ -38,7 +49,7 @@ class EvaluatorTest extends munit.FunSuite {
     } yield evaluated
 
     eitherResultOrErr match
-      case Right(obj) => assertEquals(obj.unwrap.getValue, Some(3))
+      case Right(obj) => assertEquals(obj.unwrap.asInstanceOf[Object], Object.Int(3))
       case _          => assert(false)
 
   }
@@ -56,7 +67,7 @@ class EvaluatorTest extends munit.FunSuite {
 
     eitherResultOrErr match
       case Right((obj1, obj2)) =>
-        assertEquals(obj1.unwrap.getValue, Some(10))
+        assertEquals(obj1.unwrap.asInstanceOf[Object], Object.Int(10))
         assertEquals(obj1, obj2)
       case Left(value: ParserError) =>
         println("ParserError")
@@ -101,9 +112,73 @@ class EvaluatorTest extends munit.FunSuite {
       } yield evaluated
 
       eitherResultOrErr match
-        case Right(Object.ReturnValue(v))  => assertEquals(v.getValue, Some(expected))
-        case Right(v: MonkeyPrimitiveType) => assertEquals(v.getValue, Some(expected))
+        case Right(Object.ReturnValue(v))  => assertEquals(v.asInstanceOf[Object], Object.Int(expected))
+        case Right(v: MonkeyPrimitiveType) => assertEquals(v.asInstanceOf[Object], Object.Int(expected))
         case Left(e)                       => assert(false)
     )
   }
+
+  test("結果が関数のif式を即時実行") {
+
+    val input = "if (true) {fn(x) {x + 1} }(1)"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(Object.Int(v)) => assertEquals(v, 2)
+      case _                    => assert(false)
+
+  }
+
+  test("組み込み関数lenの呼び出し") {
+    val input = "let cntOfChar = len; cntOfChar(\"abcdefg\") + len(\"hijklmn\")"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj.unwrap.asInstanceOf[Object], Object.Int(14))
+      case _          => assert(false)
+
+  }
+
+  test("配列の評価") {
+    val input = "[1,2,3]"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj, Object.Arr(Seq(Object.Int(1), Object.Int(2), Object.Int(3))))
+      case _          => assert(false)
+  }
+
+  test("配列に対する添え字アクセスの評価") {
+    val input = "let arr = [1,2,3]; arr[0]"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj, Object.Int(1))
+      case _          => assert(false)
+  }
+
+  test("配列に対する添え字アクセスの評価2") {
+    val input = "[1,2,3][0]"
+    val eitherResultOrErr = for {
+      parsed <- parseProgram.runA(input)
+      evaluated <- evalProgram(parsed).runA(Env())
+    } yield evaluated
+
+    eitherResultOrErr match
+      case Right(obj) => assertEquals(obj, Object.Int(1))
+      case _          => assert(false)
+  }
+
 }

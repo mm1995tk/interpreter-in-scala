@@ -92,5 +92,7 @@ val list = List(
   Int(10),
   NotEq,
   Int(9),
-  Semicolon
+  Semicolon,
+  Str("foobar"),
+  Str("foo bar")
 )

@@ -16,11 +16,14 @@ enum Token:
     Eq,
     NotEq,
     Comma,
+    Colon,
     Semicolon,
     LeftParen,
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Function,
     Let,
     True,
@@ -31,6 +34,7 @@ enum Token:
     Null
   case Ident(value: String)
   case Int(value: scala.Int)
+  case Str(value: String)
 
 type PrefixToken = Token.Minus.type | Token.Bang.type
 
@@ -56,11 +60,14 @@ given Show[Token] with
     case Token.Eq                   => "=="
     case Token.NotEq                => "!="
     case Token.Comma                => ","
+    case Token.Colon                => ":"
     case Token.Semicolon            => ";"
     case Token.LeftParen            => "("
     case Token.RightParen           => ")"
     case Token.LeftBrace            => "{"
     case Token.RightBrace           => "}"
+    case Token.LeftBracket          => "["
+    case Token.RightBracket         => "]"
     case Token.Function             => "fn"
     case Token.Let                  => "let"
     case Token.True                 => "true"
@@ -70,3 +77,4 @@ given Show[Token] with
     case Token.Return               => "return"
     case Token.Ident(value: String) => value
     case Token.Int(value: Int)      => value.toString()
+    case Token.Str(value: String)   => s"\"$value\""

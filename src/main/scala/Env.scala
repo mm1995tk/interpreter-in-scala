@@ -1,9 +1,14 @@
 package env
 
-import obj.MonkeyPrimitiveType
-import scala.collection.immutable.HashMap
+import obj.{MonkeyPrimitiveType, Object}
+import evaluator.builtin.*
 
-type Env = HashMap[String, MonkeyPrimitiveType]
+type Env = Map[String, MonkeyPrimitiveType]
 
-object Env:
-  def apply(): Env = new HashMap[String, MonkeyPrimitiveType]()
+def Env(): Env = Map[String, MonkeyPrimitiveType](
+  "len" -> Object.BuiltinObj(len),
+  "head" -> Object.BuiltinObj(head),
+  "tail" -> Object.BuiltinObj(tail),
+  "push" -> Object.BuiltinObj(push),
+  "puts" -> Object.BuiltinObj(puts)
+)
