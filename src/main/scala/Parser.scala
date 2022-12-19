@@ -14,7 +14,7 @@ type EitherParserErrorOr[T] = Either[ParserError, T]
 
 def parseProgram: Parser[Program] = parse()
 
-private def parse(program: Program = Seq(), endToken: Token = Token.Eof): Parser[Program] =
+private def parse(program: Program = Seq.empty, endToken: Token = Token.Eof): Parser[Program] =
   for {
     stmt <- parseStatement
     appended = program :+ stmt
@@ -53,7 +53,7 @@ private def parseExprStatement: Parser[Statement] = for {
 } yield Statement.Expr(expr, !optionalSemicolon.isEmpty)
 
 private def parseBlockStatement: Parser[Program] =
-  Parser.expect(Token.LeftBrace) *> parse(Seq(), Token.RightBrace) <* Parser.expect(Token.RightBrace)
+  Parser.expect(Token.LeftBrace) *> parse(Seq.empty, Token.RightBrace) <* Parser.expect(Token.RightBrace)
 
 private def parseExpr(precedence: Precedence = Precedence.Lowest): Parser[Expr] =
   for {
@@ -118,8 +118,9 @@ private def parseHashmap: Parser[Expr] =
 
   parseBetweenBrace {
     Parser.previewToken.flatMap {
-      case Token.RightBrace => Parser.pure(Expr.HashMap(Seq()))
-      case _ => parseCommaSeparatedExprs(parseKeyValue, Token.RightBrace).map(Expr.HashMap(_))
+      case Token.RightBrace => Parser.pure(Expr.HashMap(Map.empty))
+      case _ =>
+        parseCommaSeparatedExprs(parseKeyValue, Token.RightBrace).map(item => Expr.HashMap(item.toMap))
     }
   }
 
@@ -158,11 +159,11 @@ private def paraseFnLiteral: Parser[Expr] = for {
 private def parseCommaSeparatedExprs[T](
     parser: Parser[T],
     endToken: Token,
-    acc: Seq[T] = Seq()
+    acc: Seq[T] = Seq.empty
 ): Parser[Seq[T]] =
   def go[T](parser: Parser[T], exprs: Seq[T]): Parser[Seq[T]] = for {
     p <- Parser.previewToken
-    expr <- if p.equals(endToken) then Parser.pure(Seq()) else parser.map(Seq(_))
+    expr <- if p.equals(endToken) then Parser.pure(Seq.empty) else parser.map(Seq(_))
     updatedArgs: Seq[T] = exprs.concat(expr)
     args <- Parser.previewToken.flatMap {
       case Token.Comma             => Parser.nextToken *> go(parser, updatedArgs)

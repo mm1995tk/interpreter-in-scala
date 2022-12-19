@@ -18,7 +18,7 @@ enum Expr:
   case Int(token: Token.Int)
   case Str(token: Token.Str)
   case Arr(elems: Seq[Expr])
-  case HashMap(kvs: Seq[(Expr, Expr)])
+  case HashMap(hashmap: Map[Expr, Expr])
   case Index(obj: Expr, index: Expr)
   case Prefix(token: PrefixToken, right: Expr)
   case Infix(token: InfixToken, left: Expr, right: Expr)
@@ -43,8 +43,8 @@ given Show[Expr] with
     case Expr.Int(ident)   => ident.asInstanceOf[Token].show
     case Expr.Str(ident)   => ident.asInstanceOf[Token].show
     case Expr.Arr(elems)   => s"[${elems.map(_.show).mkString(", ")}]"
-    case Expr.HashMap(kvs) =>
-      s"{${kvs
+    case Expr.HashMap(hashmap) =>
+      s"{${hashmap.toList
           .map(kv =>
             val k -> v = kv
             s"${k.show}: ${v.show}"
