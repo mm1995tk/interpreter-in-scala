@@ -16,13 +16,12 @@ type Evaluator[T] = StateT[EitherEvalErrorOr, Env, T]
 type EitherEvalErrorOr[T] = Either[EvalError, T]
 
 def evalProgram(program: Program): Evaluator[Object] = program match
-  case Seq() => Evaluator.pure(ConstNull)
+  case Seq()  => Evaluator.pure(ConstNull)
+  case Seq(h) => evalStatement(h)
   case h :: tail =>
-    tail.foldLeft(evalStatement(h)) { (acc, cur) =>
-      acc.flatMap {
-        case obj: Object.ReturnValue => Evaluator.pure(obj)
-        case _                       => evalStatement(cur)
-      }
+    evalStatement(h).flatMap {
+      case obj: Object.ReturnValue => Evaluator.pure(obj)
+      case _                       => evalProgram(tail)
     }
 
 private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
@@ -52,12 +51,11 @@ private def evalStatement(stmt: Statement): Evaluator[Object] = stmt match
 private def evalExpr(expr: Expr): Evaluator[Object] = expr match
   case Expr.Int(Token.Int(v)) => Evaluator.pure(Object.Int(v))
   case Expr.Str(Token.Str(v)) => Evaluator.pure(Object.Str(v))
-  case Expr.Arr(elems)        => elems.map(evalExpr(_)).sequence.map(Object.Arr(_))
+  case Expr.Arr(elems)        => elems.traverse(evalExpr(_)).map(Object.Arr(_))
   case Expr.HashMap(hashmap) =>
     def pair[A, B] = (a: A) => (b: B) => (a, b)
     hashmap.toList
-      .map { item => evalExpr(item._1).map(pair) <*> evalExpr(item._2) }
-      .sequence
+      .traverse { item => evalExpr(item._1).map(pair) <*> evalExpr(item._2) }
       .map(item => Object.HashMap(item.toMap))
   case Expr.Index(obj, index) => evalIndexAccess(obj, index)
   case Expr.Bool(t) =>
@@ -154,8 +152,7 @@ private def evalCallExpr(
     case fnObj: Object.Function =>
       for {
         evaluatedArgs: Seq[(String, MonkeyPrimitiveType)] <- args
-          .map(evalExpr(_).map(_.unwrap))
-          .sequence
+          .traverse(evalExpr(_).map(_.unwrap))
           .map(_.zip(fnObj.params.map(_.value)).map(item => (item._2, item._1.unwrap)))
 
         localEnv = evaluatedArgs.foldLeft(fnObj.env) { (acc, cur) =>
@@ -166,7 +163,7 @@ private def evalCallExpr(
           env
         )
       } yield result
-    case Object.BuiltinObj(builtin) => args.map(evalExpr(_)).sequence.map(_.toList).flatMap(builtin.f)
+    case Object.BuiltinObj(builtin) => args.traverse(evalExpr(_)).map(_.toList).flatMap(builtin.f)
 
 } yield result
 
